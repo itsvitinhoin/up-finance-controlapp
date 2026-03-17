@@ -2188,8 +2188,8 @@ function nav(view, btn){  Object.values(viewMap).forEach(id=>{
           const kb = (new Blob([raw]).size/1024).toFixed(1);
           let savedAt = null;
           try { savedAt = JSON.parse(raw).savedAt; } catch(_){}
-          const dbStatus = db ? '✓ IndexedDB ativo' : '⚠ localStorage apenas';
-          el.textContent = `💾 ${dbStatus} — ${kb} KB — último salvamento: ${savedAt ? new Date(savedAt).toLocaleString('pt-BR') : 'nunca'}`;
+          const dbStatus = supabase ? '☁ Supabase ativo (nuvem)' : db ? '💾 IndexedDB local' : '⚠ localStorage apenas';
+          el.textContent = `${dbStatus} — ${kb} KB local — último salvamento: ${savedAt ? new Date(savedAt).toLocaleString('pt-BR') : 'nunca'}`;
         }
       }
     });
@@ -2312,6 +2312,7 @@ async function removeEmployee(id){
   const ok = await confirmDialog('Remover funcionário', `Remover "${e.nome}"?\nEsta ação não pode ser desfeita.`, 'Remover');
   if(!ok) return;
   S.employees = S.employees.filter(x=>x.id!==id);
+  await sbDelete('employees', id);
   persist(); renderEmployees(); toast('Funcionário removido.');
 }
 function markPaid(id){ const t=S.transactions.find(x=>x.id==id); if(t){t.st='pago'; persist(); renderAll(); toast('✓ Conta baixada!');} }
@@ -2345,6 +2346,7 @@ async function deleteTransaction(id){
   );
   if(!ok) return;
   S.transactions = S.transactions.filter(x=>x.id!=id);
+  await sbDelete('transactions', id);
   persist();
   renderAll();
   if(currentView==='dashboard') requestAnimationFrame(()=>requestAnimationFrame(drawDashCharts));
@@ -2803,298 +2805,489 @@ function closeSidebar(){
 }
 
 // ══════════════════════════════════════════
-// PERSISTÊNCIA — localStorage
 // ══════════════════════════════════════════
+// SUPABASE — banco de dados na nuvem
 // ══════════════════════════════════════════
-// BANCO DE DADOS LOCAL — IndexedDB
-// ══════════════════════════════════════════
-const DB_NAME    = 'FinanceAppGrupoUP';
-const DB_VERSION = 2;
-const STORAGE_KEY = 'financeapp_grupo_up_v1'; // localStorage fallback key
+const SUPABASE_URL = 'https://ciattbfzjrbnnzsavklz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_MS3xbM2IKhBLaOaBql1hxQ_y7B5XuXP';
+const STORAGE_KEY  = 'financeapp_grupo_up_v1';
+const DB_NAME      = 'FinanceAppGrupoUP';
+const DB_VERSION   = 2;
 
-let db = null;
+let supabase = null;
+let db       = null;
 
+async function initSupabase(){
+  try {
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Test connection
+    const { error } = await supabase.from('app_state').select('key').limit(1);
+    if(error && error.code !== 'PGRST116') console.warn('Supabase:', error.message);
+    console.log('✓ Supabase conectado');
+    return true;
+  } catch(e){
+    console.warn('Supabase indisponível, usando fallback local:', e.message);
+    return false;
+  }
+}
+
+// ── IndexedDB offline fallback ──
 function openDB(){
   return new Promise((resolve, reject)=>{
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      // Main data store — one record per "collection"
-      if(!d.objectStoreNames.contains('store'))
-        d.createObjectStore('store', {keyPath:'key'});
-      // Files store — NF-e and attachments as base64
-      if(!d.objectStoreNames.contains('files'))
-        d.createObjectStore('files', {keyPath:'id'});
+      if(!d.objectStoreNames.contains('store')) d.createObjectStore('store',{keyPath:'key'});
+      if(!d.objectStoreNames.contains('files')) d.createObjectStore('files',{keyPath:'id'});
     };
-
     req.onsuccess = e => { db = e.target.result; resolve(db); };
-    req.onerror   = e => { console.warn('IndexedDB error:', e.target.error); reject(e.target.error); };
-  });
-}
-
-function idbPut(storeName, record){
-  return new Promise((resolve, reject)=>{
-    if(!db){ reject('DB not open'); return; }
-    const tx  = db.transaction(storeName, 'readwrite');
-    const req = tx.objectStore(storeName).put(record);
-    req.onsuccess = () => resolve();
     req.onerror   = e => reject(e.target.error);
   });
 }
+function idbPut(s,r){ return new Promise((res,rej)=>{ if(!db){res();return;} const t=db.transaction(s,'readwrite'); const q=t.objectStore(s).put(r); q.onsuccess=()=>res(); q.onerror=e=>rej(e.target.error); }); }
+function idbGet(s,k){ return new Promise((res,rej)=>{ if(!db){res(null);return;} const t=db.transaction(s,'readonly'); const q=t.objectStore(s).get(k); q.onsuccess=e=>res(e.target.result||null); q.onerror=e=>rej(e.target.error); }); }
+function idbDelete(s,k){ return new Promise((res,rej)=>{ if(!db){res();return;} const t=db.transaction(s,'readwrite'); const q=t.objectStore(s).delete(k); q.onsuccess=()=>res(); q.onerror=e=>rej(e.target.error); }); }
 
-function idbGet(storeName, key){
-  return new Promise((resolve, reject)=>{
-    if(!db){ reject('DB not open'); return; }
-    const tx  = db.transaction(storeName, 'readonly');
-    const req = tx.objectStore(storeName).get(key);
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror   = e => reject(e.target.error);
-  });
-}
-
-function idbDelete(storeName, key){
-  return new Promise((resolve, reject)=>{
-    if(!db){ reject('DB not open'); return; }
-    const tx  = db.transaction(storeName, 'readwrite');
-    const req = tx.objectStore(storeName).delete(key);
-    req.onsuccess = () => resolve();
-    req.onerror   = e => reject(e.target.error);
-  });
-}
-
-// ── Save all state to IndexedDB ──
-async function saveToStorage(){
-  const payload = {
-    transactions: S.transactions,
-    employees:    S.employees,
-    subscriptions:S.subscriptions,
-    clients:      S.clients,
-    impostos:     S.impostos,
-    regime:       S.regime,
-    fatAnual:     S.fatAnual,
-    saldoInicial: S.saldoInicial,
-    saldoExtrato: S.saldoExtrato,
-    dataExtrato:  S.dataExtrato,
-    orcamentos:   S.orcamentos,
-    cats:         S.cats,
-    centros:      S.centros,
-    planos:       S.planos,
-    savedAt:      new Date().toISOString()
+// ── helpers: mapa entre campo JS e coluna SQL ──────────────
+function txToRow(t){
+  return {
+    id:           t.id,
+    date:         t.date || null,
+    descricao:    t.desc,
+    categoria:    t.cat  || null,
+    centro_custo: t.cc   || null,
+    valor:        t.v,
+    status:       t.st,
+    tipo:         t.tp,
+    cliente_id:   t.clienteId   || null,
+    cliente_nome: t.clienteNome || null,
+    nfe:          t.nfe     || false,
+    nfe_date:     t.nfeDate || null,
+    nfe_file:     t.nfeFile || false,
+    nfe_file_name:t.nfeFileName || null,
+    nfe_mime:     t.nfeMime || null,
+    observacoes:  t.obs    || null
   };
-  try {
-    if(db){
-      await idbPut('store', {key:'main', ...payload});
-    }
-    // Also keep localStorage as lightweight fallback (without file data)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch(e){
-    console.warn('Erro ao salvar dados:', e);
-    // Try localStorage only as last resort
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch(_){}
+}
+function rowToTx(r){
+  return {
+    id:          r.id,
+    date:        r.date,
+    desc:        r.descricao,
+    cat:         r.categoria,
+    cc:          r.centro_custo,
+    v:           parseFloat(r.valor),
+    st:          r.status,
+    tp:          r.tipo,
+    clienteId:   r.cliente_id,
+    clienteNome: r.cliente_nome,
+    nfe:         r.nfe,
+    nfeDate:     r.nfe_date,
+    nfeFile:     r.nfe_file,
+    nfeFileName: r.nfe_file_name,
+    nfeMime:     r.nfe_mime,
+    obs:         r.observacoes
+  };
+}
+function cliToRow(c){
+  return {
+    id:              c.id,
+    nome:            c.nome,
+    tipo_cliente:    c.tipoCliente || 'B2B',
+    contato:         c.contato    || null,
+    email:           c.email      || null,
+    telefone:        c.tel        || null,
+    plano:           c.plano      || null,
+    valor_mensal:    c.valor      || 0,
+    dia_pagamento:   c.dia        ? parseInt(c.dia) : null,
+    inicio_contrato: c.inicio     || null,
+    centro_custo:    c.cc         || null,
+    cnpj_cpf:        c.doc        || null,
+    observacoes:     c.obs        || null,
+    nfe_ativo:       c.nfe        || false,
+    status:          c.status     || 'ativo'
+  };
+}
+function rowToCli(r){
+  return {
+    id:          r.id,
+    nome:        r.nome,
+    tipoCliente: r.tipo_cliente,
+    contato:     r.contato,
+    email:       r.email,
+    tel:         r.telefone,
+    plano:       r.plano,
+    valor:       parseFloat(r.valor_mensal),
+    dia:         r.dia_pagamento,
+    inicio:      r.inicio_contrato,
+    cc:          r.centro_custo,
+    doc:         r.cnpj_cpf,
+    obs:         r.observacoes,
+    nfe:         r.nfe_ativo,
+    status:      r.status
+  };
+}
+function empToRow(e){
+  return {
+    id:              e.id,
+    nome:            e.nome,
+    cargo:           e.cargo      || null,
+    departamento:    e.dept       || null,
+    salario:         e.salario    || 0,
+    inicio_contrato: e.inicio     || null,
+    fim_contrato:    e.fim        || null,
+    tipo_contrato:   e.tipo       || 'CLT',
+    email:           e.email      || null
+  };
+}
+function rowToEmp(r){
+  return {
+    id:     r.id,
+    nome:   r.nome,
+    cargo:  r.cargo,
+    dept:   r.departamento,
+    salario:parseFloat(r.salario),
+    inicio: r.inicio_contrato,
+    fim:    r.fim_contrato,
+    tipo:   r.tipo_contrato,
+    email:  r.email
+  };
+}
+function subToRow(s){
+  return {
+    id:               s.id,
+    nome:             s.nome,
+    categoria:        s.cat            || null,
+    valor:            s.valor          || 0,
+    recorrencia:      s.recorrencia    || 'mensal',
+    inicio:           s.inicio         || null,
+    proxima_cobranca: s.prox           || null,
+    forma_pagamento:  s.pgto           || null,
+    centro_custo:     s.cc             || null,
+    observacoes:      s.obs            || null,
+    status:           s.status         || 'ativa'
+  };
+}
+function rowToSub(r){
+  return {
+    id:         r.id,
+    nome:       r.nome,
+    cat:        r.categoria,
+    valor:      parseFloat(r.valor),
+    recorrencia:r.recorrencia,
+    inicio:     r.inicio,
+    prox:       r.proxima_cobranca,
+    pgto:       r.forma_pagamento,
+    cc:         r.centro_custo,
+    obs:        r.observacoes,
+    status:     r.status
+  };
+}
+function impToRow(i){
+  return {
+    id:              i.id,
+    nome:            i.nome,
+    tipo:            i.tipo           || 'receita_bruta',
+    aliquota:        i.aliq           || 0,
+    periodicidade:   i.period         || 'mensal',
+    dia_vencimento:  i.diaVenc        ? parseInt(i.diaVenc) : null,
+    competencia:     i.competencia    || 'mensal',
+    enquadramento:   i.obs            || null,
+    status:          i.status         || 'ativo'
+  };
+}
+function rowToImp(r){
+  return {
+    id:          r.id,
+    nome:        r.nome,
+    tipo:        r.tipo,
+    aliq:        parseFloat(r.aliquota),
+    period:      r.periodicidade,
+    diaVenc:     r.dia_vencimento,
+    competencia: r.competencia,
+    obs:         r.enquadramento,
+    status:      r.status
+  };
+}
+
+// ── upsertAll: salva uma tabela inteira via upsert ──────────
+async function upsertTable(table, rows, onConflict='id'){
+  if(!supabase || !rows.length) return;
+  // upsert em lotes de 100
+  for(let i=0; i<rows.length; i+=100){
+    const batch = rows.slice(i, i+100);
+    const { error } = await supabase.from(table).upsert(batch, {onConflict});
+    if(error) console.warn(`upsert ${table}:`, error.message);
   }
 }
 
-// ── Load all state from IndexedDB (falls back to localStorage) ──
-async function loadFromStorage(){
-  let data = null;
-  try {
-    if(db){
-      const rec = await idbGet('store', 'main');
-      if(rec) data = rec;
-    }
-  } catch(e){ console.warn('IndexedDB read error:', e); }
+// ── saveSettings: salva configs e saldos ───────────────────
+async function saveSettings(){
+  if(!supabase) return;
+  const settings = [
+    {chave:'saldo_inicial',  valor: String(S.saldoInicial||0)},
+    {chave:'saldo_extrato',  valor: String(S.saldoExtrato||0)},
+    {chave:'data_extrato',   valor: S.dataExtrato||''},
+    {chave:'regime',         valor: S.regime||''},
+    {chave:'fat_anual',      valor: String(S.fatAnual||0)},
+    {chave:'orcamentos',     valor: JSON.stringify(S.orcamentos||{})},
+  ];
+  const { error } = await supabase.from('config_settings').upsert(settings, {onConflict:'chave'});
+  if(error) console.warn('saveSettings:', error.message);
+}
 
-  // Fallback to localStorage
-  if(!data){
+async function saveCats(){
+  if(!supabase) return;
+  // Delete all and re-insert (simpler than diffing)
+  await supabase.from('config_cats').delete().neq('id',0);
+  const rows = [
+    ...S.cats.desp.map((nome,i)=>({tipo:'desp',nome,ordem:i})),
+    ...S.cats.rec.map( (nome,i)=>({tipo:'rec', nome,ordem:i}))
+  ];
+  if(rows.length) await supabase.from('config_cats').insert(rows);
+}
+
+async function saveCentros(){
+  if(!supabase) return;
+  await supabase.from('config_centros').delete().neq('id',0);
+  const rows = S.centros.map((nome,i)=>({
+    nome, ordem:i,
+    orcamento_mensal: S.orcamentos?.[nome] || 0
+  }));
+  if(rows.length) await supabase.from('config_centros').insert(rows);
+}
+
+async function savePlanos(){
+  if(!supabase) return;
+  await supabase.from('config_planos').delete().neq('id',0);
+  const rows = S.planos.map((nome,i)=>({nome,ordem:i}));
+  if(rows.length) await supabase.from('config_planos').insert(rows);
+}
+
+// ── SAVE — grava tabelas separadas + fallback local ─────────
+async function saveToStorage(){
+  // Fallback local sempre (offline safety)
+  const payload = {
+    transactions:S.transactions, employees:S.employees, subscriptions:S.subscriptions,
+    clients:S.clients, impostos:S.impostos, regime:S.regime, fatAnual:S.fatAnual,
+    saldoInicial:S.saldoInicial, saldoExtrato:S.saldoExtrato, dataExtrato:S.dataExtrato,
+    orcamentos:S.orcamentos, cats:S.cats, centros:S.centros, planos:S.planos,
+    savedAt: new Date().toISOString()
+  };
+  try { await idbPut('store',{key:'main',...payload}); } catch(_){}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch(_){}
+
+  if(!supabase) return;
+
+  // Salva tabelas separadas em paralelo
+  try {
+    await Promise.all([
+      upsertTable('transactions',   S.transactions.map(txToRow)),
+      upsertTable('clients',        S.clients.map(cliToRow)),
+      upsertTable('employees',      S.employees.map(empToRow)),
+      upsertTable('subscriptions',  S.subscriptions.map(subToRow)),
+      upsertTable('impostos',       S.impostos.map(impToRow)),
+      saveSettings(),
+    ]);
+  } catch(e){ console.warn('Supabase save error:', e.message); }
+}
+
+// ── LOAD — lê tabelas separadas do Supabase ─────────────────
+async function loadFromStorage(){
+  // Tenta Supabase primeiro
+  if(supabase){
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(raw) data = JSON.parse(raw);
-    } catch(e){ console.warn('localStorage read error:', e); }
+      const [txRes, cliRes, empRes, subRes, impRes, settRes, catsRes, centRes, planRes] = await Promise.all([
+        supabase.from('transactions')   .select('*').order('date',{ascending:false}),
+        supabase.from('clients')        .select('*').order('nome'),
+        supabase.from('employees')      .select('*').order('nome'),
+        supabase.from('subscriptions')  .select('*').order('nome'),
+        supabase.from('impostos')       .select('*').order('nome'),
+        supabase.from('config_settings').select('*'),
+        supabase.from('config_cats')    .select('*').order('tipo').order('ordem'),
+        supabase.from('config_centros') .select('*').order('ordem'),
+        supabase.from('config_planos')  .select('*').order('ordem'),
+      ]);
+
+      // Só aplica se pelo menos uma query retornou dados
+      const hasData = [txRes,cliRes,empRes,subRes,impRes].some(r=>r.data?.length);
+      const hasConfig = settRes.data?.length || catsRes.data?.length;
+
+      if(hasData || hasConfig){
+        if(txRes.data)   S.transactions  = txRes.data.map(rowToTx);
+        if(cliRes.data)  S.clients       = cliRes.data.map(rowToCli);
+        if(empRes.data)  S.employees     = empRes.data.map(rowToEmp);
+        if(subRes.data)  S.subscriptions = subRes.data.map(rowToSub);
+        if(impRes.data)  S.impostos      = impRes.data.map(rowToImp);
+
+        // Configurações
+        if(settRes.data){
+          const cfg = Object.fromEntries(settRes.data.map(r=>[r.chave, r.valor]));
+          if(cfg.saldo_inicial !== undefined) S.saldoInicial = parseFloat(cfg.saldo_inicial)||0;
+          if(cfg.saldo_extrato !== undefined) S.saldoExtrato = parseFloat(cfg.saldo_extrato)||0;
+          if(cfg.data_extrato)  S.dataExtrato = cfg.data_extrato;
+          if(cfg.regime)        S.regime      = cfg.regime;
+          if(cfg.fat_anual)     S.fatAnual    = parseFloat(cfg.fat_anual)||0;
+          if(cfg.orcamentos)    try { S.orcamentos = JSON.parse(cfg.orcamentos); } catch(_){}
+        }
+        if(catsRes.data && catsRes.data.length){
+          S.cats.desp = catsRes.data.filter(r=>r.tipo==='desp').map(r=>r.nome);
+          S.cats.rec  = catsRes.data.filter(r=>r.tipo==='rec') .map(r=>r.nome);
+        }
+        if(centRes.data && centRes.data.length)
+          S.centros = centRes.data.map(r=>r.nome);
+        if(planRes.data && planRes.data.length)
+          S.planos  = planRes.data.map(r=>r.nome);
+
+        console.log(`✓ Supabase: ${S.transactions.length} transações, ${S.clients.length} clientes`);
+        return true;
+      }
+    } catch(e){ console.warn('Supabase load error:', e.message); }
   }
 
-  if(!data) return false;
+  // Fallback IndexedDB
+  try {
+    const r = await idbGet('store','main');
+    if(r){ applyState(r); return true; }
+  } catch(_){}
 
-  if(data.transactions)  S.transactions  = data.transactions;
-  if(data.employees)     S.employees     = data.employees;
-  if(data.subscriptions) S.subscriptions = data.subscriptions;
-  if(data.clients)       S.clients       = data.clients;
-  if(data.impostos)      S.impostos      = data.impostos;
-  if(data.regime)        S.regime        = data.regime;
-  if(data.fatAnual)      S.fatAnual      = data.fatAnual;
-  if(data.saldoInicial !== undefined) S.saldoInicial = data.saldoInicial;
-  if(data.saldoExtrato !== undefined) S.saldoExtrato = data.saldoExtrato;
-  if(data.dataExtrato)   S.dataExtrato   = data.dataExtrato;
-  if(data.orcamentos)    S.orcamentos    = data.orcamentos;
-  if(data.cats)          S.cats          = data.cats;
-  if(data.centros)       S.centros       = data.centros;
-  if(data.planos)        S.planos        = data.planos;
-  return true;
+  // Fallback localStorage
+  try {
+    const r = localStorage.getItem(STORAGE_KEY);
+    if(r){ applyState(JSON.parse(r)); return true; }
+  } catch(_){}
+
+  return false;
+}
+
+function applyState(data){
+  if(data.transactions)             S.transactions  = data.transactions;
+  if(data.employees)                S.employees     = data.employees;
+  if(data.subscriptions)            S.subscriptions = data.subscriptions;
+  if(data.clients)                  S.clients       = data.clients;
+  if(data.impostos)                 S.impostos      = data.impostos;
+  if(data.regime)                   S.regime        = data.regime;
+  if(data.fatAnual)                 S.fatAnual      = data.fatAnual;
+  if(data.saldoInicial !== undefined) S.saldoInicial= data.saldoInicial;
+  if(data.saldoExtrato !== undefined) S.saldoExtrato= data.saldoExtrato;
+  if(data.dataExtrato)              S.dataExtrato   = data.dataExtrato;
+  if(data.orcamentos)               S.orcamentos    = data.orcamentos;
+  if(data.cats)                     S.cats          = data.cats;
+  if(data.centros)                  S.centros       = data.centros;
+  if(data.planos)                   S.planos        = data.planos;
+}
+
+// ── DELETE de registro individual (mais eficiente que upsert tudo) ──
+async function sbDelete(table, id){
+  if(!supabase) return;
+  try { await supabase.from(table).delete().eq('id', id); } catch(e){ console.warn(`delete ${table}:`, e.message); }
 }
 
 async function clearStorage(){
-  const ok = await confirmDialog(
-    '⚠ Apagar todos os dados',
-    'Isso apagará TODAS as transações, clientes, NF-e e arquivos.\nEsta ação não pode ser desfeita.',
-    'Apagar tudo',
-    'btn-danger'
-  );
+  const ok = await confirmDialog('⚠ Apagar todos os dados','Isso apagará TODAS as transações, clientes, NF-e e arquivos.\nEsta ação não pode ser desfeita.','Apagar tudo','btn-danger');
   if(!ok) return;
-  localStorage.removeItem(STORAGE_KEY);
-  if(db){
-    // Clear all stores
-    ['store','files'].forEach(name=>{
-      try {
-        const tx = db.transaction(name,'readwrite');
-        tx.objectStore(name).clear();
-      } catch(e){}
-    });
+  if(supabase){
+    await Promise.allSettled([
+      supabase.from('transactions') .delete().neq('id',0),
+      supabase.from('clients')      .delete().neq('id',0),
+      supabase.from('employees')    .delete().neq('id',0),
+      supabase.from('subscriptions').delete().neq('id',0),
+      supabase.from('impostos')     .delete().neq('id',0),
+      supabase.from('nfe_files')    .delete().neq('id','_'),
+      supabase.from('config_settings').upsert([
+        {chave:'saldo_inicial',valor:'0'},{chave:'saldo_extrato',valor:'0'},
+        {chave:'data_extrato',valor:''},{chave:'regime',valor:''},{chave:'fat_anual',valor:'0'}
+      ],{onConflict:'chave'}),
+    ]);
   }
+  localStorage.removeItem(STORAGE_KEY);
+  if(db) ['store','files'].forEach(n=>{ try{ db.transaction(n,'readwrite').objectStore(n).clear(); }catch(_){} });
   toast('Dados apagados. Recarregando…');
   setTimeout(()=>location.reload(), 900);
 }
 
 async function exportBackup(){
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if(!raw && !db){ toast('Nenhum dado para exportar.'); return; }
-
-  // Gather file attachments from IndexedDB
+  const payload = {
+    transactions:S.transactions, employees:S.employees, subscriptions:S.subscriptions,
+    clients:S.clients, impostos:S.impostos, regime:S.regime, fatAnual:S.fatAnual,
+    saldoInicial:S.saldoInicial, saldoExtrato:S.saldoExtrato, dataExtrato:S.dataExtrato,
+    orcamentos:S.orcamentos, cats:S.cats, centros:S.centros, planos:S.planos,
+  };
   let files = [];
-  try {
-    if(db){
-      const tx = db.transaction('files','readonly');
-      const store = tx.objectStore('files');
-      files = await new Promise((res,rej)=>{
-        const req = store.getAll();
-        req.onsuccess = e => res(e.target.result||[]);
-        req.onerror   = e => rej(e.target.error);
-      });
-    }
-  } catch(e){ console.warn('Could not export files:', e); }
-
-  const payload = raw ? JSON.parse(raw) : {};
-  payload._files = files;
-  payload._exportedAt = new Date().toISOString();
-  payload._version = DB_VERSION;
-
-  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `financeapp_backup_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  toast('✓ Backup completo exportado (inclui NF-e)!');
+  if(supabase){ try{ const {data}=await supabase.from('nfe_files').select('*'); if(data) files=data; }catch(_){} }
+  else if(db){ try{ files=await new Promise((res,rej)=>{ const q=db.transaction('files','readonly').objectStore('files').getAll(); q.onsuccess=e=>res(e.target.result||[]); q.onerror=e=>rej(e.target.error); }); }catch(_){} }
+  payload._files=files; payload._exportedAt=new Date().toISOString();
+  const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`financeapp_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
+  toast('✓ Backup completo exportado!');
 }
 
 function importBackup(file){
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = async e => {
+  const reader=new FileReader();
+  reader.onload=async e=>{
     try {
-      const data = JSON.parse(e.target.result);
-      if(!data.transactions && !data.clients){ alert('Arquivo inválido.'); return; }
-      const dateStr = data._exportedAt ? new Date(data._exportedAt).toLocaleString('pt-BR') : 'data desconhecida';
-      const ok = await confirmDialog('Importar backup', `Substituir todos os dados pelo backup de ${dateStr}?`, 'Importar', 'btn-primary');
+      const data=JSON.parse(e.target.result);
+      if(!data.transactions&&!data.clients){ alert('Arquivo inválido.'); return; }
+      const dateStr=data._exportedAt?new Date(data._exportedAt).toLocaleString('pt-BR'):'data desconhecida';
+      const ok=await confirmDialog('Importar backup',`Substituir todos os dados pelo backup de ${dateStr}?`,'Importar','btn-primary');
       if(!ok) return;
-
-      // Restore files to IndexedDB
-      if(data._files && db){
-        const tx = db.transaction('files','readwrite');
-        const store = tx.objectStore('files');
-        store.clear();
-        data._files.forEach(f => store.put(f));
-      }
-      delete data._files;
-      delete data._exportedAt;
-      delete data._version;
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      if(db) await idbPut('store', {key:'main', ...data});
-      toast('✓ Backup restaurado! Recarregando…');
-      setTimeout(()=>location.reload(), 900);
-    } catch(err){ alert('Erro ao ler o arquivo: ' + err.message); }
+      const files=data._files||[];
+      if(supabase&&files.length){ for(const f of files){ try{ await supabase.from('nfe_files').upsert(f,{onConflict:'id'}); }catch(_){} } }
+      else if(db&&files.length){ const tx=db.transaction('files','readwrite'); tx.objectStore('files').clear(); files.forEach(f=>tx.objectStore('files').put(f)); }
+      delete data._files; delete data._exportedAt; delete data._version;
+      applyState(data); await saveToStorage();
+      toast('✓ Backup restaurado! Recarregando…'); setTimeout(()=>location.reload(),900);
+    } catch(err){ alert('Erro ao ler o arquivo: '+err.message); }
   };
   reader.readAsText(file);
 }
 
-// ── Autosave wrapper ──
 const _origSave = saveToStorage;
-function persist(){
-  saveToStorage(); // async — fire and forget
-}
+function persist(){ saveToStorage(); }
+
 
 // ══════════════════════════════════════════
 // NF-e — UPLOAD / DOWNLOAD
 // ══════════════════════════════════════════
 function uploadNFe(event, txId){
-  const file = event.target.files[0];
-  if(!file) return;
-  if(file.size > 10 * 1024 * 1024){ alert('Arquivo muito grande. Máximo: 10 MB.'); return; }
-
-  const reader = new FileReader();
-  reader.onload = async e => {
-    const base64 = e.target.result; // data:mime;base64,...
-    // Store file in IndexedDB files store
-    const fileRecord = {
-      id:       `nfe_tx_${txId}`,
-      txId,
-      name:     file.name,
-      mime:     file.type,
-      size:     file.size,
-      data:     base64,
-      uploadedAt: new Date().toISOString()
-    };
-    try {
-      if(db) await idbPut('files', fileRecord);
-    } catch(e){ console.warn('Could not save NF-e file to IndexedDB:', e); }
-
-    // Mark the transaction as having a file (store metadata only in main state)
-    const t = S.transactions.find(x=>x.id===txId);
-    if(t){
-      t.nfe         = true;
-      t.nfeDate     = new Date().toISOString().split('T')[0];
-      t.nfeFile     = true;
-      t.nfeFileName = file.name;
-      t.nfeMime     = file.type;
-      persist();
-      renderReceber();
-      toast(`✓ NF-e "${file.name}" anexada!`);
-    }
+  const file=event.target.files[0]; if(!file) return;
+  if(file.size>10*1024*1024){ alert('Arquivo muito grande. Máximo: 10 MB.'); return; }
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const base64=e.target.result;
+    const rec={id:`nfe_tx_${txId}`,tx_id:txId,name:file.name,mime:file.type,size:file.size,data:base64,uploaded_at:new Date().toISOString()};
+    if(supabase){ try{ await supabase.from('nfe_files').upsert(rec,{onConflict:'id'}); }catch(err){ console.warn('NF-e save error:',err.message); } }
+    try{ await idbPut('files',{...rec,id:`nfe_tx_${txId}`}); }catch(_){}
+    const t=S.transactions.find(x=>x.id==txId);
+    if(t){ t.nfe=true; t.nfeDate=new Date().toISOString().split('T')[0]; t.nfeFile=true; t.nfeFileName=file.name; t.nfeMime=file.type; persist(); renderReceber(); toast(`✓ NF-e "${file.name}" anexada!`); }
   };
   reader.readAsDataURL(file);
 }
 
 async function downloadNFe(txId){
-  const t = S.transactions.find(x=>x.id===txId);
-  if(!t || !t.nfeFile){ toast('Nenhum arquivo de NF-e encontrado.'); return; }
-
-  try {
-    if(!db){ toast('Banco de dados não disponível.'); return; }
-    const fileRecord = await idbGet('files', `nfe_tx_${txId}`);
-    if(!fileRecord){ toast('Arquivo não encontrado no banco local. Pode ter sido limpo.'); return; }
-
-    const a = document.createElement('a');
-    a.href     = fileRecord.data;
-    a.download = fileRecord.name || `nfe_${txId}`;
-    a.click();
-    toast(`✓ Baixando "${fileRecord.name}"…`);
-  } catch(e){
-    console.error('Erro ao baixar NF-e:', e);
-    toast('Erro ao baixar o arquivo.');
-  }
+  const t=S.transactions.find(x=>x.id==txId);
+  if(!t||!t.nfeFile){ toast('Nenhum arquivo de NF-e encontrado.'); return; }
+  let rec=null;
+  if(supabase){ try{ const {data}=await supabase.from('nfe_files').select('*').eq('id',`nfe_tx_${txId}`).maybeSingle(); if(data) rec=data; }catch(_){} }
+  if(!rec&&db){ try{ rec=await idbGet('files',`nfe_tx_${txId}`); }catch(_){} }
+  if(!rec){ toast('Arquivo não encontrado.'); return; }
+  const a=document.createElement('a'); a.href=rec.data; a.download=rec.name||`nfe_${txId}`; a.click();
+  toast(`✓ Baixando "${rec.name}"…`);
 }
 
 async function removeNFeFile(txId){
-  const ok = await confirmDialog('Remover NF-e', 'Remover o arquivo de NF-e deste lançamento?', 'Remover');
+  const ok=await confirmDialog('Remover NF-e','Remover o arquivo de NF-e deste lançamento?','Remover');
   if(!ok) return;
-  try {
-    if(db) await idbDelete('files', `nfe_tx_${txId}`);
-  } catch(e){}
-  const t = S.transactions.find(x=>x.id===txId);
-  if(t){ t.nfeFile = false; t.nfeFileName = null; t.nfeMime = null; persist(); renderReceber(); }
+  if(supabase) try{ await supabase.from('nfe_files').delete().eq('id',`nfe_tx_${txId}`); }catch(_){}
+  if(db) try{ await idbDelete('files',`nfe_tx_${txId}`); }catch(_){}
+  const t=S.transactions.find(x=>x.id==txId);
+  if(t){ t.nfeFile=false; t.nfeFileName=null; t.nfeMime=null; persist(); renderReceber(); }
   toast('Arquivo de NF-e removido.');
 }
 
-// ══════════════════════════════════════════
 // SETTINGS HELPERS — persist on every change
 // ══════════════════════════════════════════
 function addCat(type){ const inp=document.getElementById(`new-cat-${type}`); const val=inp.value.trim(); if(!val)return; S.cats[type].push(val); inp.value=''; persist(); renderSettings(); toast('Categoria adicionada!'); }
@@ -3108,17 +3301,19 @@ function removePlano(i){ S.planos.splice(i,1); persist(); renderSettings(); toas
 // INIT — abre IndexedDB primeiro, depois carrega estado
 // ══════════════════════════════════════════
 async function boot(){
-  // 1. Open IndexedDB
-  try { await openDB(); }
-  catch(e){ console.warn('IndexedDB indisponível, usando localStorage:', e); }
+  // 1. Tenta conectar ao Supabase (dados na nuvem)
+  const hasSupabase = await initSupabase();
 
-  // 2. Load all state
+  // 2. Abre IndexedDB como fallback offline
+  try { await openDB(); } catch(e){ console.warn('IndexedDB indisponível:', e); }
+
+  // 3. Carrega dados
   const hadData = await loadFromStorage();
 
-  // 3. Render UI
+  // 4. Renderiza UI
   renderAll();
 
-  // 4. Restore input field values from state
+  // 5. Restaura valores de inputs
   const fieldMap = [
     ['f-saldo-input',  ()=>S.saldoInicial],
     ['conc-ext-input', ()=>S.saldoExtrato],
@@ -3128,7 +3323,7 @@ async function boot(){
   ];
   fieldMap.forEach(([id, val])=>{ const el=document.getElementById(id); if(el&&val()) el.value=val(); });
 
-  // 5. Paint dashboard charts after layout
+  // 6. Desenha gráficos
   requestAnimationFrame(()=>{
     requestAnimationFrame(()=>{
       drawDashCharts();
@@ -3136,23 +3331,19 @@ async function boot(){
     });
   });
 
-  // 6. Welcome toast
+  // 7. Toast de boas-vindas
   if(hadData){
+    const src = hasSupabase ? '☁ Supabase' : '💾 local';
     try {
-      const rec = db ? await idbGet('store','main') : null;
-      const savedAt = rec?.savedAt || JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}').savedAt;
-      if(savedAt) toast('✓ Dados restaurados — ' + new Date(savedAt).toLocaleString('pt-BR'));
-    } catch(e){ toast('✓ Dados carregados.'); }
+      const savedAt = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}').savedAt;
+      toast(`✓ Dados carregados (${src}) — ${savedAt ? new Date(savedAt).toLocaleString('pt-BR') : ''}`);
+    } catch(_){ toast(`✓ Dados carregados (${src})`); }
   } else {
     toast('Bem-vindo ao FinanceApp! Comece adicionando transações.');
   }
-
-  // 7. Show DB status in Configurações storage-info when opened
-  if(db) console.log('✓ IndexedDB aberto:', DB_NAME, 'v'+DB_VERSION);
 }
 
 boot();
 </script>
 </body>
 </html>
-
