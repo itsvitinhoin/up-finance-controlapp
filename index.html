@@ -416,6 +416,7 @@ th.num{text-align:right}
     <div class="nav-label">Gestão</div>
     <button class="ni" onclick="nav('clientes',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="5" r="2.5"/><circle cx="11" cy="5" r="2.5"/><path d="M1 14c0-2.8 1.8-5 4-5M15 14c0-2.8-1.8-5-4-5M8 14c0-2.8-1.1-4.5-3-5"/></svg>Clientes<span class="nb" id="badge-cli">0</span></button>
     <button class="ni" onclick="nav('funcionarios',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>Funcionários</button>
+    <button class="ni" onclick="nav('despesas-fixas',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5 8h6M8 5v6"/></svg>Despesas Fixas</button>
     <button class="ni" onclick="nav('assinaturas',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 7h12M5 10.5h2M9 10.5h2"/></svg>Assinaturas<span class="nb" id="badge-as">0</span></button>
     <button class="ni" onclick="nav('configuracoes',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>Configurações</button>
   </div>
@@ -923,6 +924,30 @@ th.num{text-align:right}
       </div>
     </div>
 
+    <!-- ══ DESPESAS FIXAS ══ -->
+    <div id="view-despesas-fixas" style="display:none">
+      <div class="mg m3">
+        <div class="metric"><div class="m-label">Total mensal</div><div class="m-value md2" id="df-total">—</div><div class="m-sub" id="df-count"></div></div>
+        <div class="metric"><div class="m-label">Total anual estimado</div><div class="m-value" id="df-anual">—</div><div class="m-sub">projeção 12 meses</div></div>
+        <div class="metric"><div class="m-label">Próximo vencimento</div><div class="m-value mw" id="df-prox">—</div><div class="m-sub mw" id="df-prox-sub"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Despesas Fixas</span>
+          <input class="srch" placeholder="Buscar…" oninput="ftable(this,'tb-df')">
+          <button class="btn btn-primary btn-sm" onclick="openDFModal()">+ Adicionar</button>
+        </div>
+        <div class="tw"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Centro de Custo</th><th>Dia Venc.</th><th class="num">Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="tb-df"></tbody></table></div>
+      </div>
+      <div class="settings-section" style="margin-top:16px">
+        <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2 2"/></svg>
+          As despesas fixas ativas são geradas automaticamente nas Contas a Pagar e no Calendário a cada virada de mês.
+          <button class="btn btn-outline btn-sm" onclick="gerarDespesasMes()">↺ Gerar para o mês atual</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ CONFIGURAÇÕES ══ -->
     <div id="view-configuracoes" style="display:none">
 
@@ -1038,20 +1063,24 @@ th.num{text-align:right}
   <div class="modal">
     <div class="modal-hd"><span class="modal-title" id="emp-modal-title">Novo Funcionário</span><button class="modal-close" onclick="closeModal('overlay-emp')">×</button></div>
     <div class="fg">
-      <div class="fr"><label class="fl">Nome completo *</label><input class="fi" id="emp-nome" placeholder="Ex: João Silva"></div>
+      <div class="fr"><label class="fl">Nome Completo *</label><input class="fi" id="emp-nome" placeholder="Ex: João Silva"></div>
+      <div class="fr"><label class="fl">E-mail</label><input class="fi" type="email" id="emp-email" placeholder="email@empresa.com"></div>
+    </div>
+    <div class="fg">
+      <div class="fr"><label class="fl">Telefone</label><input class="fi" id="emp-tel" placeholder="(11) 99999-9999"></div>
       <div class="fr"><label class="fl">Cargo / Função</label><input class="fi" id="emp-cargo" placeholder="Ex: Analista Financeiro"></div>
     </div>
     <div class="fg">
       <div class="fr"><label class="fl">Departamento</label><select class="fi" id="emp-dept"></select></div>
-      <div class="fr"><label class="fl">Salário (R$)</label><input class="fi" type="number" id="emp-salario" placeholder="0,00"></div>
+      <div class="fr"><label class="fl">Salário (R$) *</label><input class="fi" type="number" id="emp-salario" placeholder="0,00" min="0" step="0.01"></div>
     </div>
     <div class="fg">
-      <div class="fr"><label class="fl">Início do contrato</label><input class="fi" type="date" id="emp-inicio"></div>
-      <div class="fr"><label class="fl">Fim do contrato</label><input class="fi" type="date" id="emp-fim" placeholder="Em branco = CLT indefinido"></div>
+      <div class="fr"><label class="fl">Data de Pagamento *</label><input class="fi" type="number" id="emp-dia-pgto" placeholder="Dia do mês: 5, 10…" min="1" max="31"></div>
+      <div class="fr"><label class="fl">Início de Contrato</label><input class="fi" type="date" id="emp-inicio"></div>
     </div>
     <div class="fg">
-      <div class="fr"><label class="fl">Tipo de contrato</label><select class="fi" id="emp-tipo-contrato"><option>CLT</option><option>PJ</option><option>Estágio</option><option>Temporário</option><option>Freelancer</option></select></div>
-      <div class="fr"><label class="fl">Email</label><input class="fi" type="email" id="emp-email" placeholder="email@empresa.com"></div>
+      <div class="fr"><label class="fl">Fim de Contrato <span style="color:var(--text3);font-weight:400">(vazio = indeterminado)</span></label><input class="fi" type="date" id="emp-fim"></div>
+      <div class="fr"><label class="fl">Tipo de Contrato</label><select class="fi" id="emp-tipo-contrato"><option>CLT</option><option>PJ</option><option>Estágio</option><option>Temporário</option><option>Freelancer</option></select></div>
     </div>
     <div class="fa"><button class="btn btn-outline" onclick="closeModal('overlay-emp')">Cancelar</button><button class="btn btn-primary" onclick="saveEmployee()">Salvar funcionário</button></div>
   </div>
@@ -1096,38 +1125,43 @@ th.num{text-align:right}
 
 <!-- ═══ MODAL CLIENTE ═══ -->
 <div class="overlay" id="overlay-cli" onclick="if(event.target===this)closeModal('overlay-cli')">
-  <div class="modal" style="width:520px">
+  <div class="modal" style="width:560px">
     <div class="modal-hd"><span class="modal-title" id="cli-modal-title">Novo Cliente</span><button class="modal-close" onclick="closeModal('overlay-cli')">×</button></div>
-    <div class="fg">
-      <div class="fr"><label class="fl">Nome do cliente / Empresa *</label><input class="fi" id="cli-nome" placeholder="Ex: Empresa ABC Ltda"></div>
-      <div class="fr"><label class="fl">Responsável / Contato</label><input class="fi" id="cli-contato" placeholder="Ex: João Silva"></div>
+    <div class="fr"><label class="fl">Tipo de Cliente</label>
+      <select class="fi" id="cli-tipo-cliente">
+        <option value="B2B">B2B — Pessoa Jurídica</option>
+        <option value="B2C">B2C — Pessoa Física</option>
+      </select>
     </div>
     <div class="fg">
-      <div class="fr"><label class="fl">Tipo de cliente</label>
-        <select class="fi" id="cli-tipo-cliente">
-          <option value="B2B">B2B — Pessoa Jurídica</option>
-          <option value="B2C">B2C — Pessoa Física</option>
-        </select>
-      </div>
-      <div class="fr"><label class="fl">CNPJ / CPF</label><input class="fi" id="cli-doc" placeholder="00.000.000/0001-00"></div>
+      <div class="fr"><label class="fl">Nome do Cliente / Empresa *</label><input class="fi" id="cli-nome" placeholder="Ex: Empresa ABC Ltda"></div>
+      <div class="fr"><label class="fl">Responsável</label><input class="fi" id="cli-contato" placeholder="Ex: João Silva"></div>
     </div>
+    <div class="fr"><label class="fl">CNPJ</label><input class="fi" id="cli-doc" placeholder="00.000.000/0001-00"></div>
     <div class="fg">
-      <div class="fr"><label class="fl">Email</label><input class="fi" type="email" id="cli-email" placeholder="email@empresa.com"></div>
+      <div class="fr"><label class="fl">E-mail</label><input class="fi" type="email" id="cli-email" placeholder="email@empresa.com"></div>
       <div class="fr"><label class="fl">Telefone / WhatsApp</label><input class="fi" id="cli-tel" placeholder="(11) 99999-9999"></div>
     </div>
     <div class="fg">
-      <div class="fr"><label class="fl">Tipo de Plano *</label><select class="fi" id="cli-plano"></select></div>
-      <div class="fr"><label class="fl">Valor mensal (R$) *</label><input class="fi" type="number" id="cli-valor" placeholder="0,00" min="0" step="0.01"></div>
+      <div class="fr"><label class="fl">Tipo de Plano</label><select class="fi" id="cli-plano"></select></div>
+      <div class="fr"><label class="fl">Valor Mensal (R$) *</label><input class="fi" type="number" id="cli-valor" placeholder="0,00" min="0" step="0.01"></div>
     </div>
     <div class="fg">
-      <div class="fr"><label class="fl">Dia de pagamento *</label><input class="fi" type="number" id="cli-dia" placeholder="Ex: 5, 10, 15…" min="1" max="31"></div>
-      <div class="fr"><label class="fl">Início do contrato</label><input class="fi" type="date" id="cli-inicio"></div>
+      <div class="fr"><label class="fl">Data de Pagamento *</label><input class="fi" type="number" id="cli-dia" placeholder="Dia do mês: 5, 10, 15…" min="1" max="31"></div>
+      <div class="fr"><label class="fl">Início de Contrato</label><input class="fi" type="date" id="cli-inicio"></div>
     </div>
     <div class="fg">
-      <div class="fr"><label class="fl">Centro de Custo</label><select class="fi" id="cli-cc"></select></div>
-      <div class="fr"><label class="fl">Início do contrato</label><input class="fi" type="date" id="cli-inicio"></div>
+      <div class="fr"><label class="fl">Final de Contrato</label><input class="fi" type="date" id="cli-fim"></div>
+      <div class="fr"><label class="fl">Contrato Assinado <span style="color:var(--text3);font-weight:400">(PDF/Imagem)</span></label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;flex:1;text-align:center">
+            <span id="cli-contrato-label">📎 Selecionar arquivo</span>
+            <input type="file" id="cli-contrato-file" accept=".pdf,.png,.jpg,.jpeg,.docx" style="display:none" onchange="previewContratoFile(this)">
+          </label>
+          <button class="btn btn-danger btn-sm" id="cli-contrato-clear" style="display:none" onclick="clearContratoFile()">✕</button>
+        </div>
+      </div>
     </div>
-    <div class="fr"><label class="fl">Observações</label><input class="fi" id="cli-obs" placeholder="Notas, condições especiais, etc…"></div>
     <div class="fa">
       <button class="btn btn-outline" onclick="closeModal('overlay-cli')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveClient()">Salvar cliente</button>
@@ -1224,6 +1258,27 @@ th.num{text-align:right}
   </div>
 </div>
 
+<!-- ═══ MODAL DESPESA FIXA ═══ -->
+<div class="overlay" id="overlay-df" onclick="if(event.target===this)closeModal('overlay-df')">
+  <div class="modal" style="width:500px">
+    <div class="modal-hd"><span class="modal-title" id="df-modal-title">Nova Despesa Fixa</span><button class="modal-close" onclick="closeModal('overlay-df')">×</button></div>
+    <div class="fr"><label class="fl">Descrição *</label><input class="fi" id="df-desc" placeholder="Ex: Aluguel, Energia elétrica, Internet…"></div>
+    <div class="fg">
+      <div class="fr"><label class="fl">Valor (R$) *</label><input class="fi" type="number" id="df-valor" placeholder="0,00" min="0" step="0.01"></div>
+      <div class="fr"><label class="fl">Dia de Vencimento *</label><input class="fi" type="number" id="df-dia" placeholder="Ex: 5, 10, 15…" min="1" max="31"></div>
+    </div>
+    <div class="fg">
+      <div class="fr"><label class="fl">Categoria</label><select class="fi" id="df-cat"></select></div>
+      <div class="fr"><label class="fl">Centro de Custo</label><select class="fi" id="df-cc"></select></div>
+    </div>
+    <div class="fr"><label class="fl">Observações</label><input class="fi" id="df-obs" placeholder="Fornecedor, contrato, notas…"></div>
+    <div class="fa">
+      <button class="btn btn-outline" onclick="closeModal('overlay-df')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveDespesaFixa()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ MODAL CONFIRMAÇÃO ═══ -->
 <div id="confirm-overlay">
   <div id="confirm-box">
@@ -1248,18 +1303,18 @@ const S = {
     rec:  ['Serviços Prestados','Vendas de Produtos','Receita Financeira','Outros']
   },
   centros: ['Operações','Comercial','RH','TI','Administrativo'],
-  transactions: [
-  ],
+  transactions: [],
   employees: [],
   subscriptions: [],
   clients: [],
   impostos: [],
+  despesasFixas: [],
   regime: '',
   fatAnual: 0,
   saldoInicial: 0,
   saldoExtrato: 0,
   dataExtrato: '',
-  orcamentos: {},   // { "CentroDeCusto": valorMensal }
+  orcamentos: {},
   concFilter: 'todos',
   planos: ['Starter','Profissional','Enterprise','Personalizado'],
   fluxoFilter: 'all',
@@ -1301,7 +1356,7 @@ function renderAll(){
   renderDash(); renderPagar(); renderReceber(); renderFluxo();
   renderDRE(); renderCentro(); renderConc();
   renderEmployees(); renderSubscriptions(); renderClients();
-  renderImpostos(); renderSettings();
+  renderImpostos(); renderSettings(); renderDespesasFixas();
   renderCalendar();
   updateBadges();
 }
@@ -1853,7 +1908,6 @@ function renderClients(){
   const cls = S.clients;
   const ativos = cls.filter(c=>c.status==='ativo');
   const mrr = ativos.reduce((a,c)=>a+(parseFloat(c.valor)||0),0);
-  const now = new Date();
   const pgtoMes = ativos.filter(c=>getCliNextDue(c)>=0&&getCliNextDue(c)<=31).length;
   const venc7 = ativos.filter(c=>getCliNextDue(c)<=7&&getCliNextDue(c)>=0).length;
   const venc7val = ativos.filter(c=>getCliNextDue(c)<=7&&getCliNextDue(c)>=0).reduce((a,c)=>a+(parseFloat(c.valor)||0),0);
@@ -1867,33 +1921,34 @@ function renderClients(){
   document.getElementById('cli-venc7-val').textContent = venc7>0?fm(venc7val)+' a receber':'—';
 
   const filtered = cliFilter==='todos'?cls:cls.filter(c=>c.status===cliFilter);
+
+  // Update table header
+  const thead = document.querySelector('#tb-cli').closest('table')?.querySelector('thead tr');
+  if(thead) thead.innerHTML = '<th>Cliente</th><th>Plano</th><th>E-mail</th><th>Telefone</th><th class="num">Valor Mensalidade</th><th class="num">GMV Pago</th><th>Data Pagamento</th><th>NF-e</th><th>Status</th><th>Ação</th>';
+
   document.getElementById('tb-cli').innerHTML = filtered.length===0
-    ? `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text3)">Nenhum cliente cadastrado. Clique em "+ Novo Cliente" para começar.</td></tr>`
+    ? `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text3)">Nenhum cliente cadastrado. Clique em "+ Novo Cliente" para começar.</td></tr>`
     : filtered.map(c=>{
-        const dias = getCliNextDue(c);
+        const dias    = getCliNextDue(c);
         const dueDate = getCliNextDueDate(c);
-        const dueStyle = dias<=0?'color:var(--red);font-weight:600':dias<=7?'color:var(--amber);font-weight:600':'';
+        const dueStyle= dias<=0?'color:var(--red);font-weight:600':dias<=7?'color:var(--amber);font-weight:600':'';
+        // GMV Pago = soma de transações recebidas vinculadas ao cliente
+        const gmv = S.transactions.filter(t=>t.tp==='entrada'&&t.st==='recebido'&&t.clienteId==c.id).reduce((a,t)=>a+t.v,0);
         return `<tr>
           <td>
             <div style="font-weight:500">${c.nome}</div>
             ${c.contato?`<div style="font-size:11px;color:var(--text2)">${c.contato}</div>`:''}
             ${c.doc?`<div style="font-size:10px;color:var(--text3)">${c.doc}</div>`:''}
           </td>
-          <td><span class="badge b-blue">${c.plano}</span> <span class="badge ${c.tipoCliente==='B2C'?'b-purple':'b-gray'}" style="margin-left:3px">${c.tipoCliente||'B2B'}</span></td>
-          <td>
-            ${c.email?`<div style="font-size:11px">${c.email}</div>`:''}
-            ${c.tel?`<div style="font-size:11px;color:var(--text2)">${c.tel}</div>`:''}
-          </td>
+          <td><span class="badge b-blue">${c.plano||'—'}</span><br><span class="badge ${c.tipoCliente==='B2C'?'b-purple':'b-gray'}" style="margin-top:2px">${c.tipoCliente||'B2B'}</span></td>
+          <td style="font-size:12px">${c.email||'—'}</td>
+          <td style="font-size:12px">${c.tel||'—'}</td>
           <td class="num" style="font-weight:600;color:var(--green)">${fm(c.valor)}</td>
-          <td style="text-align:center">Dia ${c.dia}</td>
-          <td style="${dueStyle}">${fd(dueDate)}${dias<=7&&dias>=0?` <span class="badge b-amber" style="font-size:9px">${dias===0?'Hoje':dias+'d'}</span>`:''}</td>
-          <td>
-            <button class="btn btn-sm ${c.nfe?'btn-primary':'btn-outline'}" onclick="toggleCliNFe(${c.id})">
-              ${c.nfe?'✓ NF-e':'○ NF-e'}
-            </button>
-          </td>
+          <td class="num" style="font-weight:600;color:var(--blue)">${gmv>0?fm(gmv):'—'}</td>
+          <td style="${dueStyle}">Dia ${c.dia}<br><span style="font-size:11px;font-weight:400">${fd(dueDate)}${dias<=7&&dias>=0?` <span class="badge b-amber" style="font-size:9px">${dias===0?'Hoje':dias+'d'}</span>`:''}</span></td>
+          <td><button class="btn btn-sm ${c.nfe?'btn-primary':'btn-outline'}" onclick="toggleCliNFe(${c.id})">${c.nfe?'✓ NF-e':'○ NF-e'}</button></td>
           <td>${c.status==='ativo'?'<span class="badge b-green">Ativo</span>':'<span class="badge b-gray">Inativo</span>'}</td>
-          <td style="display:flex;gap:5px">
+          <td style="display:flex;gap:4px;flex-wrap:wrap">
             <button class="btn btn-outline btn-sm" onclick="editClient(${c.id})">Editar</button>
             <button class="btn btn-${c.status==='ativo'?'danger':'outline'} btn-sm" onclick="toggleClient(${c.id})">${c.status==='ativo'?'Inativar':'Reativar'}</button>
           </td>
@@ -1901,51 +1956,109 @@ function renderClients(){
       }).join('');
 }
 
+// ── Contrato upload preview ──
+let _contratoBase64 = null;
+let _contratoFileName = null;
+function previewContratoFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 10*1024*1024){ alert('Arquivo muito grande. Máximo: 10 MB.'); input.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    _contratoBase64 = e.target.result;
+    _contratoFileName = file.name;
+    document.getElementById('cli-contrato-label').textContent = '✓ ' + file.name.substring(0,28);
+    document.getElementById('cli-contrato-clear').style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+function clearContratoFile(){
+  _contratoBase64 = null; _contratoFileName = null;
+  document.getElementById('cli-contrato-label').textContent = '📎 Selecionar arquivo';
+  document.getElementById('cli-contrato-clear').style.display = 'none';
+  document.getElementById('cli-contrato-file').value = '';
+}
+
 function openCliModal(cli){
   renderSettings();
+  _contratoBase64 = null; _contratoFileName = null;
+  document.getElementById('cli-contrato-label').textContent = '📎 Selecionar arquivo';
+  document.getElementById('cli-contrato-clear').style.display = 'none';
   document.getElementById('overlay-cli').classList.add('open');
   document.getElementById('cli-modal-title').textContent = cli ? 'Editar Cliente' : 'Novo Cliente';
   if(cli){
-    ['nome','contato','email','tel','valor','dia','doc','obs'].forEach(f=>{ const el=document.getElementById('cli-'+f); if(el)el.value=cli[f]||''; });
-    document.getElementById('cli-plano').value       = cli.plano||'';
-    document.getElementById('cli-inicio').value      = cli.inicio||'';
-    document.getElementById('cli-cc').value          = cli.cc||'';
-    document.getElementById('cli-tipo-cliente').value= cli.tipoCliente||'B2B';
+    ['nome','contato','email','tel','valor','dia','doc'].forEach(f=>{ const el=document.getElementById('cli-'+f); if(el)el.value=cli[f]||''; });
+    document.getElementById('cli-plano').value        = cli.plano||'';
+    document.getElementById('cli-inicio').value       = cli.inicio||'';
+    document.getElementById('cli-fim').value          = cli.fim||'';
+    document.getElementById('cli-tipo-cliente').value = cli.tipoCliente||'B2B';
     document.getElementById('cli-modal-title').dataset.editId = cli.id;
+    if(cli.contratoFileName){
+      document.getElementById('cli-contrato-label').textContent = '✓ ' + cli.contratoFileName.substring(0,28);
+      document.getElementById('cli-contrato-clear').style.display = '';
+      _contratoFileName = cli.contratoFileName;
+      _contratoBase64   = cli.contrato || null;
+    }
   } else {
-    ['nome','contato','email','tel','valor','dia','doc','obs'].forEach(f=>{ const el=document.getElementById('cli-'+f); if(el)el.value=''; });
+    ['nome','contato','email','tel','valor','dia','doc'].forEach(f=>{ const el=document.getElementById('cli-'+f); if(el)el.value=''; });
     document.getElementById('cli-inicio').value = new Date().toISOString().split('T')[0];
+    document.getElementById('cli-fim').value    = '';
     document.getElementById('cli-tipo-cliente').value = 'B2B';
     delete document.getElementById('cli-modal-title').dataset.editId;
   }
 }
+
 function saveClient(){
-  const nome = document.getElementById('cli-nome').value.trim();
+  const nome  = document.getElementById('cli-nome').value.trim();
   const valor = parseFloat(document.getElementById('cli-valor').value)||0;
-  const dia = document.getElementById('cli-dia').value;
+  const dia   = document.getElementById('cli-dia').value;
   if(!nome||!valor||!dia){ alert('Preencha nome, valor e dia de pagamento.'); return; }
   const editId = document.getElementById('cli-modal-title').dataset.editId;
+  const isNew  = !editId;
   const cli = {
-    id: editId?parseInt(editId):Date.now(),
+    id:              editId ? parseInt(editId) : Date.now(),
     nome,
-    tipoCliente: document.getElementById('cli-tipo-cliente').value,
-    contato: document.getElementById('cli-contato').value,
-    email:   document.getElementById('cli-email').value,
-    tel:     document.getElementById('cli-tel').value,
-    plano:   document.getElementById('cli-plano').value,
+    tipoCliente:     document.getElementById('cli-tipo-cliente').value,
+    contato:         document.getElementById('cli-contato').value,
+    email:           document.getElementById('cli-email').value,
+    tel:             document.getElementById('cli-tel').value,
+    plano:           document.getElementById('cli-plano').value,
     valor, dia,
-    inicio:  document.getElementById('cli-inicio').value,
-    cc:      document.getElementById('cli-cc').value,
-    doc:     document.getElementById('cli-doc').value,
-    obs:     document.getElementById('cli-obs').value,
-    nfe: editId ? (S.clients.find(c=>c.id===parseInt(editId))||{}).nfe||false : false,
+    inicio:          document.getElementById('cli-inicio').value,
+    fim:             document.getElementById('cli-fim').value,
+    doc:             document.getElementById('cli-doc').value,
+    contrato:        _contratoBase64,
+    contratoFileName:_contratoFileName,
+    nfe:  editId ? (S.clients.find(c=>c.id===parseInt(editId))||{}).nfe||false : false,
     status:'ativo'
   };
   if(editId){ const i=S.clients.findIndex(c=>c.id===cli.id); if(i>=0)S.clients[i]=cli; }
   else S.clients.push(cli);
+
+  // Auto-gerar transação em Contas a Receber se for novo cliente
+  if(isNew && valor && dia){
+    const now   = new Date();
+    const dueDay= parseInt(dia);
+    const month = now.getDate() > dueDay ? now.getMonth()+1 : now.getMonth();
+    const year  = month > 11 ? now.getFullYear()+1 : now.getFullYear();
+    const dueDate = `${year}-${String((month%12)+1 || 12).padStart(2,'0')}-${String(Math.min(dueDay,28)).padStart(2,'0')}`;
+    S.transactions.push({
+      id: Date.now()+1,
+      date: dueDate,
+      desc: `Mensalidade — ${nome}`,
+      cat: 'Serviços Prestados',
+      cc: '',
+      v: valor,
+      st: 'pendente',
+      tp: 'entrada',
+      clienteId:   cli.id,
+      clienteNome: nome
+    });
+  }
+
   persist();
-  closeModal('overlay-cli'); renderClients(); updateBadges(); renderCalendar();
-  toast('✓ Cliente salvo!');
+  closeModal('overlay-cli'); renderClients(); updateBadges(); renderCalendar(); renderReceber();
+  toast(isNew ? '✓ Cliente salvo e cobrança gerada!' : '✓ Cliente atualizado!');
 }
 function editClient(id){ openCliModal(S.clients.find(c=>c.id===id)); }
 function toggleClient(id){ const c=S.clients.find(x=>x.id===id); if(!c)return; c.status=c.status==='ativo'?'inativo':'ativo'; renderClients(); updateBadges(); toast(c.status==='ativo'?'Cliente reativado.':'Cliente inativado.'); }
@@ -1964,7 +2077,6 @@ function renderCalendar(){
   const monthName = new Date(y,m,1).toLocaleString('pt-BR',{month:'long',year:'numeric'});
   lbl.textContent = monthName.charAt(0).toUpperCase()+monthName.slice(1);
 
-  // Build events map: key = "YYYY-MM-DD"
   const evMap = {};
   const addEv = (dateStr, label, cls) => {
     if(!dateStr) return;
@@ -1972,33 +2084,44 @@ function renderCalendar(){
     evMap[dateStr].push({label, cls});
   };
 
-  // Transactions
+  // Transações pendentes
   S.transactions.forEach(t=>{
-    if(t.tp==='saida'&&['pendente','vencido'].includes(t.st)) addEv(t.date, t.desc.substring(0,18), 'ev-pagar');
-    if(t.tp==='entrada'&&['pendente'].includes(t.st)) addEv(t.date, t.desc.substring(0,18), 'ev-receber');
+    if(t.tp==='saida'&&['pendente','vencido'].includes(t.st))  addEv(t.date, t.desc.substring(0,18), 'ev-pagar');
+    if(t.tp==='entrada'&&t.st==='pendente')                      addEv(t.date, t.desc.substring(0,18), 'ev-receber');
   });
-  // Assinaturas
-  S.subscriptions.filter(s=>s.status==='ativa').forEach(s=>{ addEv(s.prox, s.nome.substring(0,18), 'ev-assinatura'); });
-  // Clientes
+
+  // Assinaturas ativas
+  S.subscriptions.filter(s=>s.status==='ativa').forEach(s=>{
+    addEv(s.prox, s.nome.substring(0,18), 'ev-assinatura');
+  });
+
+  // Clientes — dia de pagamento individual
   S.clients.filter(c=>c.status==='ativo').forEach(c=>{
-    const day = parseInt(c.dia)||1;
+    const day     = parseInt(c.dia)||1;
     const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(Math.min(day,28)).padStart(2,'0')}`;
     addEv(dateStr, c.nome.substring(0,18), 'ev-receber');
   });
-  // Employees: folha on day 5 of each month if any employees
-  if(S.employees.length>0){
-    const folhaDate = `${y}-${String(m+1).padStart(2,'0')}-05`;
-    addEv(folhaDate, 'Folha de Pagamento', 'ev-folha');
-  }
+
+  // Funcionários — dia de pagamento individual (ou dia 5 como fallback)
+  S.employees.forEach(e=>{
+    const day     = parseInt(e.diaPgto)||5;
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(Math.min(day,28)).padStart(2,'0')}`;
+    addEv(dateStr, ('Salário — '+e.nome).substring(0,20), 'ev-folha');
+  });
+
+  // Despesas Fixas ativas — aparecem todo mês no dia de vencimento
+  (S.despesasFixas||[]).filter(d=>d.status==='ativa').forEach(df=>{
+    const day     = parseInt(df.dia)||5;
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(Math.min(day,28)).padStart(2,'0')}`;
+    addEv(dateStr, df.desc.substring(0,18), 'ev-pagar');
+  });
 
   // Render grid
-  const firstDay = new Date(y, m, 1).getDay();
+  const firstDay    = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m+1, 0).getDate();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr    = new Date().toISOString().split('T')[0];
   let html = '';
-  // Leading empty days
   for(let i=0;i<firstDay;i++) html += `<div class="cal-day other-month"></div>`;
-  // Days of month
   for(let d=1;d<=daysInMonth;d++){
     const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isToday = dateStr===todayStr;
@@ -2146,6 +2269,7 @@ const viewMap = {
   'impostos':'view-impostos','projecoes':'view-projecoes',
   'centro':'view-centro','conciliacao':'view-conciliacao',
   'clientes':'view-clientes','funcionarios':'view-funcionarios',
+  'despesas-fixas':'view-despesas-fixas',
   'assinaturas':'view-assinaturas','configuracoes':'view-configuracoes'
 };
 const titleMap = {
@@ -2154,6 +2278,7 @@ const titleMap = {
   'impostos':'Impostos e Obrigações Fiscais','projecoes':'Projeções 12 Meses',
   'centro':'Centro de Custo','conciliacao':'Conciliação Bancária',
   'clientes':'Clientes','funcionarios':'Gestão de Funcionários',
+  'despesas-fixas':'Despesas Fixas',
   'assinaturas':'Assinaturas e Recorrências','configuracoes':'Configurações'
 };
 let currentView = 'dashboard';
@@ -2268,41 +2393,72 @@ function openEmpModal(emp){
   document.getElementById('overlay-emp').classList.add('open');
   document.getElementById('emp-modal-title').textContent = emp ? 'Editar Funcionário' : 'Novo Funcionário';
   if(emp){
-    document.getElementById('emp-nome').value=emp.nome;
-    document.getElementById('emp-cargo').value=emp.cargo;
-    document.getElementById('emp-dept').value=emp.dept;
-    document.getElementById('emp-salario').value=emp.salario;
-    document.getElementById('emp-inicio').value=emp.inicio;
-    document.getElementById('emp-fim').value=emp.fim||'';
-    document.getElementById('emp-tipo-contrato').value=emp.tipo;
-    document.getElementById('emp-email').value=emp.email;
-    document.getElementById('emp-modal-title').dataset.editId=emp.id;
+    document.getElementById('emp-nome').value          = emp.nome||'';
+    document.getElementById('emp-email').value         = emp.email||'';
+    document.getElementById('emp-tel').value           = emp.tel||'';
+    document.getElementById('emp-cargo').value         = emp.cargo||'';
+    document.getElementById('emp-dept').value          = emp.dept||'';
+    document.getElementById('emp-salario').value       = emp.salario||'';
+    document.getElementById('emp-dia-pgto').value      = emp.diaPgto||'';
+    document.getElementById('emp-inicio').value        = emp.inicio||'';
+    document.getElementById('emp-fim').value           = emp.fim||'';
+    document.getElementById('emp-tipo-contrato').value = emp.tipo||'CLT';
+    document.getElementById('emp-modal-title').dataset.editId = emp.id;
   } else {
-    document.getElementById('emp-inicio').value=new Date().toISOString().split('T')[0];
+    ['emp-nome','emp-email','emp-tel','emp-cargo','emp-dia-pgto','emp-fim'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('emp-salario').value = '';
+    document.getElementById('emp-inicio').value  = new Date().toISOString().split('T')[0];
+    document.getElementById('emp-tipo-contrato').value = 'CLT';
     delete document.getElementById('emp-modal-title').dataset.editId;
   }
 }
 
 function saveEmployee(){
-  const nome = document.getElementById('emp-nome').value.trim();
-  if(!nome){ alert('Informe o nome.'); return; }
+  const nome    = document.getElementById('emp-nome').value.trim();
+  const salario = parseFloat(document.getElementById('emp-salario').value)||0;
+  const diaPgto = document.getElementById('emp-dia-pgto').value;
+  if(!nome){ alert('Informe o nome do funcionário.'); return; }
   const editId = document.getElementById('emp-modal-title').dataset.editId;
+  const isNew  = !editId;
   const emp = {
-    id: editId ? parseInt(editId) : Date.now(),
-    nome, cargo:document.getElementById('emp-cargo').value,
-    dept:document.getElementById('emp-dept').value,
-    salario:parseFloat(document.getElementById('emp-salario').value)||0,
-    inicio:document.getElementById('emp-inicio').value,
-    fim:document.getElementById('emp-fim').value,
-    tipo:document.getElementById('emp-tipo-contrato').value,
-    email:document.getElementById('emp-email').value
+    id:      editId ? parseInt(editId) : Date.now(),
+    nome,
+    email:   document.getElementById('emp-email').value,
+    tel:     document.getElementById('emp-tel').value,
+    cargo:   document.getElementById('emp-cargo').value,
+    dept:    document.getElementById('emp-dept').value,
+    salario,
+    diaPgto,
+    inicio:  document.getElementById('emp-inicio').value,
+    fim:     document.getElementById('emp-fim').value,
+    tipo:    document.getElementById('emp-tipo-contrato').value,
   };
   if(editId){ const i=S.employees.findIndex(e=>e.id===emp.id); if(i>=0)S.employees[i]=emp; }
   else S.employees.push(emp);
+
+  // Auto-gerar lançamento em Contas a Pagar se for novo funcionário com salário e dia
+  if(isNew && salario && diaPgto){
+    const now    = new Date();
+    const dueDay = parseInt(diaPgto);
+    const month  = now.getDate() > dueDay ? now.getMonth()+1 : now.getMonth();
+    const year   = month > 11 ? now.getFullYear()+1 : now.getFullYear();
+    const dueDate = `${year}-${String((month%12)+1||12).padStart(2,'0')}-${String(Math.min(dueDay,28)).padStart(2,'0')}`;
+    S.transactions.push({
+      id:   Date.now()+2,
+      date: dueDate,
+      desc: `Salário — ${nome}`,
+      cat:  'Salários e Encargos',
+      cc:   emp.dept||'',
+      v:    -salario,
+      st:   'pendente',
+      tp:   'saida'
+    });
+  }
+
   persist();
   closeModal('overlay-emp');
-  renderEmployees();
-  toast('✓ Funcionário salvo!');
+  renderEmployees(); renderPagar(); renderCalendar(); updateBadges();
+  toast(isNew ? '✓ Funcionário salvo e lançamento gerado!' : '✓ Funcionário atualizado!');
 }
 
 function editEmployee(id){ openEmpModal(S.employees.find(e=>e.id===id)); }
@@ -2451,8 +2607,149 @@ function toggleNFe(id){
 // ══════════════════════════════════════════
 // ASSINATURAS
 // ══════════════════════════════════════════
+// DESPESAS FIXAS
+// ══════════════════════════════════════════
+function renderDespesasFixas(){
+  const dfs    = S.despesasFixas || [];
+  const ativas = dfs.filter(d=>d.status==='ativa');
+  const total  = ativas.reduce((a,d)=>a+(parseFloat(d.valor)||0), 0);
+  const prox   = ativas.reduce((a,d)=>{ const day=parseInt(d.dia)||1; return day<a?day:a; }, 31);
+  const el_t   = document.getElementById('df-total');
+  const el_a   = document.getElementById('df-anual');
+  const el_p   = document.getElementById('df-prox');
+  const el_ps  = document.getElementById('df-prox-sub');
+  const el_c   = document.getElementById('df-count');
+  if(el_t)  el_t.textContent  = fm(total);
+  if(el_c)  el_c.textContent  = `${ativas.length} ativa${ativas.length!==1?'s':''}`;
+  if(el_a)  el_a.textContent  = fm(total * 12);
+  if(el_p)  el_p.textContent  = prox < 31 ? `Dia ${prox}` : '—';
+  if(el_ps) el_ps.textContent = 'do mês';
+
+  const tb = document.getElementById('tb-df');
+  if(!tb) return;
+  tb.innerHTML = dfs.length === 0
+    ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text3)">Nenhuma despesa fixa. Clique em "+ Adicionar" para começar.</td></tr>`
+    : dfs.map(d=>`
+      <tr>
+        <td style="font-weight:500">${d.desc}</td>
+        <td>${d.cat||'—'}</td>
+        <td>${d.cc||'—'}</td>
+        <td style="text-align:center">Dia ${d.dia}</td>
+        <td class="num" style="color:var(--red);font-weight:600">${fm(d.valor)}</td>
+        <td>${d.status==='ativa'?'<span class="badge b-green">Ativa</span>':'<span class="badge b-gray">Inativa</span>'}</td>
+        <td style="display:flex;gap:5px">
+          <button class="btn btn-outline btn-sm" onclick="editDespesaFixa('${d.id}')">Editar</button>
+          <button class="btn btn-${d.status==='ativa'?'warning':'outline'} btn-sm" onclick="toggleDespesaFixa('${d.id}')">${d.status==='ativa'?'Pausar':'Ativar'}</button>
+          <button class="btn btn-danger btn-sm" onclick="removeDespesaFixa('${d.id}')">✕</button>
+        </td>
+      </tr>`).join('');
+}
+
+function openDFModal(df){
+  renderSettings();
+  document.getElementById('overlay-df').classList.add('open');
+  document.getElementById('df-modal-title').textContent = df ? 'Editar Despesa Fixa' : 'Nova Despesa Fixa';
+  if(df){
+    document.getElementById('df-desc').value  = df.desc||'';
+    document.getElementById('df-valor').value = df.valor||'';
+    document.getElementById('df-dia').value   = df.dia||'';
+    document.getElementById('df-cat').value   = df.cat||'';
+    document.getElementById('df-cc').value    = df.cc||'';
+    document.getElementById('df-obs').value   = df.obs||'';
+    document.getElementById('df-modal-title').dataset.editId = df.id;
+  } else {
+    ['df-desc','df-valor','df-dia','df-obs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    delete document.getElementById('df-modal-title').dataset.editId;
+  }
+}
+
+function saveDespesaFixa(){
+  const desc  = document.getElementById('df-desc').value.trim();
+  const valor = parseFloat(document.getElementById('df-valor').value)||0;
+  const dia   = document.getElementById('df-dia').value;
+  if(!desc||!valor||!dia){ alert('Preencha descrição, valor e dia de vencimento.'); return; }
+  const editId = document.getElementById('df-modal-title').dataset.editId;
+  const df = {
+    id:     editId || String(Date.now()),
+    desc,
+    valor,
+    dia,
+    cat:    document.getElementById('df-cat').value,
+    cc:     document.getElementById('df-cc').value,
+    obs:    document.getElementById('df-obs').value,
+    status: editId ? (S.despesasFixas.find(d=>d.id===editId)||{}).status||'ativa' : 'ativa'
+  };
+  if(!S.despesasFixas) S.despesasFixas = [];
+  if(editId){ const i=S.despesasFixas.findIndex(d=>d.id===editId); if(i>=0)S.despesasFixas[i]=df; }
+  else S.despesasFixas.push(df);
+  persist(); closeModal('overlay-df'); renderDespesasFixas(); renderCalendar();
+  toast('✓ Despesa fixa salva!');
+}
+
+function editDespesaFixa(id){ openDFModal((S.despesasFixas||[]).find(d=>d.id===id)); }
+
+function toggleDespesaFixa(id){
+  if(!S.despesasFixas) return;
+  const df = S.despesasFixas.find(d=>d.id===id);
+  if(!df) return;
+  df.status = df.status==='ativa' ? 'inativa' : 'ativa';
+  persist(); renderDespesasFixas(); renderCalendar();
+  toast(df.status==='ativa' ? '✓ Despesa ativada.' : 'Despesa pausada.');
+}
+
+async function removeDespesaFixa(id){
+  const ok = await confirmDialog('Remover despesa fixa', 'Remover esta despesa fixa permanentemente?', 'Remover');
+  if(!ok) return;
+  S.despesasFixas = (S.despesasFixas||[]).filter(d=>d.id!==id);
+  persist(); renderDespesasFixas(); renderCalendar();
+  toast('Despesa fixa removida.');
+}
+
+// Gera transações em Contas a Pagar para o mês atual com base nas despesas fixas ativas
+function gerarDespesasMes(){
+  if(!S.despesasFixas || !S.despesasFixas.length){ toast('Nenhuma despesa fixa ativa cadastrada.'); return; }
+  const now   = new Date();
+  const y     = now.getFullYear();
+  const m     = now.getMonth();
+  const ym    = `${y}-${String(m+1).padStart(2,'0')}`;
+  let geradas = 0;
+
+  S.despesasFixas.filter(d=>d.status==='ativa').forEach(df=>{
+    const day     = Math.min(parseInt(df.dia)||5, 28);
+    const dateStr = `${ym}-${String(day).padStart(2,'0')}`;
+    // Verifica se já existe lançamento deste mês para esta despesa
+    const jaExiste = S.transactions.some(t=>
+      t.tp==='saida' &&
+      t.desc===df.desc &&
+      t.date===dateStr
+    );
+    if(!jaExiste){
+      S.transactions.push({
+        id:   Date.now() + geradas,
+        date: dateStr,
+        desc: df.desc,
+        cat:  df.cat||'Outros',
+        cc:   df.cc||'',
+        v:    -(parseFloat(df.valor)||0),
+        st:   'pendente',
+        tp:   'saida'
+      });
+      geradas++;
+    }
+  });
+
+  if(geradas > 0){
+    persist(); renderAll();
+    toast(`✓ ${geradas} despesa${geradas>1?'s':''} gerada${geradas>1?'s':''} para ${new Date(y,m,1).toLocaleString('pt-BR',{month:'long',year:'numeric'})}!`);
+  } else {
+    toast('Todas as despesas já foram lançadas este mês.');
+  }
+}
+
+// ══════════════════════════════════════════
 let asFilter = 'todas';
 function asTab(btn, tipo){ asFilter=tipo; document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); btn.classList.add('active'); renderSubscriptions(); }
+
 
 function renderSubscriptions(){
   const subs = S.subscriptions;
@@ -3070,7 +3367,7 @@ async function saveToStorage(){
   // Fallback local sempre (offline safety)
   const payload = {
     transactions:S.transactions, employees:S.employees, subscriptions:S.subscriptions,
-    clients:S.clients, impostos:S.impostos, regime:S.regime, fatAnual:S.fatAnual,
+    clients:S.clients, impostos:S.impostos, despesasFixas:S.despesasFixas||[], regime:S.regime, fatAnual:S.fatAnual,
     saldoInicial:S.saldoInicial, saldoExtrato:S.saldoExtrato, dataExtrato:S.dataExtrato,
     orcamentos:S.orcamentos, cats:S.cats, centros:S.centros, planos:S.planos,
     savedAt: new Date().toISOString()
@@ -3167,6 +3464,7 @@ function applyState(data){
   if(data.subscriptions)            S.subscriptions = data.subscriptions;
   if(data.clients)                  S.clients       = data.clients;
   if(data.impostos)                 S.impostos      = data.impostos;
+  if(data.despesasFixas)            S.despesasFixas = data.despesasFixas;
   if(data.regime)                   S.regime        = data.regime;
   if(data.fatAnual)                 S.fatAnual      = data.fatAnual;
   if(data.saldoInicial !== undefined) S.saldoInicial= data.saldoInicial;
@@ -3210,7 +3508,7 @@ async function clearStorage(){
 async function exportBackup(){
   const payload = {
     transactions:S.transactions, employees:S.employees, subscriptions:S.subscriptions,
-    clients:S.clients, impostos:S.impostos, regime:S.regime, fatAnual:S.fatAnual,
+    clients:S.clients, impostos:S.impostos, despesasFixas:S.despesasFixas||[], regime:S.regime, fatAnual:S.fatAnual,
     saldoInicial:S.saldoInicial, saldoExtrato:S.saldoExtrato, dataExtrato:S.dataExtrato,
     orcamentos:S.orcamentos, cats:S.cats, centros:S.centros, planos:S.planos,
   };
