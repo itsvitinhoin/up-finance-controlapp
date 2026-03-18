@@ -3719,6 +3719,30 @@ function rowToEmp(r){
     email:  r.email
   };
 }
+function dfToRow(d){
+  return {
+    id:              String(d.id),
+    descricao:       d.desc       || '',
+    categoria:       d.cat        || null,
+    valor:           d.valor      || 0,
+    dia_vencimento:  d.dia        ? parseInt(d.dia) : null,
+    centro_custo:    d.cc         || null,
+    observacoes:     d.obs        || null,
+    status:          d.status     || 'ativa'
+  };
+}
+function rowToDf(r){
+  return {
+    id:     r.id,
+    desc:   r.descricao,
+    cat:    r.categoria,
+    valor:  parseFloat(r.valor),
+    dia:    r.dia_vencimento ? String(r.dia_vencimento) : '',
+    cc:     r.centro_custo,
+    obs:    r.observacoes,
+    status: r.status
+  };
+}
 function subToRow(s){
   return {
     id:               s.id,
@@ -3861,6 +3885,7 @@ async function saveToStorage(){
       upsertTable('clients',        S.clients.map(cliToRow)),
       upsertTable('employees',      S.employees.map(empToRow)),
       upsertTable('subscriptions',  S.subscriptions.map(subToRow)),
+      upsertTable('despesas_fixas', S.despesasFixas.map(dfToRow)),
       upsertTable('impostos',       S.impostos.map(impToRow)),
       saveSettings(),
       saveCats(),
@@ -3875,11 +3900,12 @@ async function loadFromStorage(){
   // Tenta Supabase primeiro
   if(supabase){
     try {
-      const [txRes, cliRes, empRes, subRes, impRes, settRes, catsRes, centRes, planRes] = await Promise.all([
+      const [txRes, cliRes, empRes, subRes, dfRes, impRes, settRes, catsRes, centRes, planRes] = await Promise.all([
         supabase.from('transactions')   .select('*').order('date',{ascending:false}),
         supabase.from('clients')        .select('*').order('nome'),
         supabase.from('employees')      .select('*').order('nome'),
         supabase.from('subscriptions')  .select('*').order('nome'),
+        supabase.from('despesas_fixas') .select('*'),
         supabase.from('impostos')       .select('*').order('nome'),
         supabase.from('config_settings').select('*'),
         supabase.from('config_cats')    .select('*').order('tipo').order('ordem'),
@@ -3888,15 +3914,24 @@ async function loadFromStorage(){
       ]);
 
       // Só aplica se pelo menos uma query retornou dados
-      const hasData = [txRes,cliRes,empRes,subRes,impRes].some(r=>r.data?.length);
+      const hasData = [txRes,cliRes,empRes,subRes,dfRes,impRes].some(r=>r.data?.length);
       const hasConfig = settRes.data?.length || catsRes.data?.length;
 
       if(hasData || hasConfig){
-        if(txRes.data)   S.transactions  = txRes.data.map(rowToTx);
-        if(cliRes.data)  S.clients       = cliRes.data.map(rowToCli);
-        if(empRes.data)  S.employees     = empRes.data.map(rowToEmp);
-        if(subRes.data)  S.subscriptions = subRes.data.map(rowToSub);
-        if(impRes.data)  S.impostos      = impRes.data.map(rowToImp);
+        if(txRes.data?.length)  S.transactions  = txRes.data.map(rowToTx);
+        if(cliRes.data?.length) S.clients       = cliRes.data.map(rowToCli);
+        if(empRes.data?.length) S.employees     = empRes.data.map(rowToEmp);
+        if(subRes.data?.length) S.subscriptions = subRes.data.map(rowToSub);
+        if(dfRes.data?.length)  S.despesasFixas = dfRes.data.map(rowToDf);
+        if(impRes.data?.length) S.impostos      = impRes.data.map(rowToImp);
+
+        // Fallback: se Supabase retornou vazio para assinaturas/despesas fixas,
+        // usa localStorage para não perder dados salvos localmente
+        try {
+          const local = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+          if(!S.subscriptions.length && local.subscriptions?.length) S.subscriptions = local.subscriptions;
+          if(!S.despesasFixas.length && local.despesasFixas?.length) S.despesasFixas = local.despesasFixas;
+        } catch(_){}
 
         // Configurações
         if(settRes.data){
