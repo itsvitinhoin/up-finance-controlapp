@@ -1880,6 +1880,10 @@ function renderSettings(){
   if(cliPlanoSel) cliPlanoSel.innerHTML = S.planos.map(p=>`<option>${p}</option>`).join('');
   const cliCcSel = document.getElementById('cli-cc');
   if(cliCcSel) cliCcSel.innerHTML = S.centros.map(c=>`<option>${c}</option>`).join('');
+  const dfCatSel = document.getElementById('df-cat');
+  if(dfCatSel) dfCatSel.innerHTML = S.cats.desp.map(c=>`<option>${c}</option>`).join('');
+  const dfCcSel = document.getElementById('df-cc');
+  if(dfCcSel) dfCcSel.innerHTML = S.centros.map(c=>`<option>${c}</option>`).join('');
 }
 
 // ══════════════════════════════════════════
@@ -2035,33 +2039,13 @@ function saveClient(){
   if(editId){ const i=S.clients.findIndex(c=>c.id===cli.id); if(i>=0)S.clients[i]=cli; }
   else S.clients.push(cli);
 
-  // Auto-gerar transação em Contas a Receber se for novo cliente
-  if(isNew && valor && dia){
-    const now   = new Date();
-    const dueDay= parseInt(dia);
-    const month = now.getDate() > dueDay ? now.getMonth()+1 : now.getMonth();
-    const year  = month > 11 ? now.getFullYear()+1 : now.getFullYear();
-    const dueDate = `${year}-${String((month%12)+1 || 12).padStart(2,'0')}-${String(Math.min(dueDay,28)).padStart(2,'0')}`;
-    S.transactions.push({
-      id: Date.now()+1,
-      date: dueDate,
-      desc: `Mensalidade — ${nome}`,
-      cat: 'Serviços Prestados',
-      cc: '',
-      v: valor,
-      st: 'pendente',
-      tp: 'entrada',
-      clienteId:   cli.id,
-      clienteNome: nome
-    });
-  }
-
+  autoGerarLancamentos(true);
   persist();
   closeModal('overlay-cli'); renderClients(); updateBadges(); renderCalendar(); renderReceber();
-  toast(isNew ? '✓ Cliente salvo e cobrança gerada!' : '✓ Cliente atualizado!');
+  toast(isNew ? '✓ Cliente salvo e cobrança gerada em Contas a Receber!' : '✓ Cliente atualizado!');
 }
 function editClient(id){ openCliModal(S.clients.find(c=>c.id===id)); }
-function toggleClient(id){ const c=S.clients.find(x=>x.id===id); if(!c)return; c.status=c.status==='ativo'?'inativo':'ativo'; renderClients(); updateBadges(); toast(c.status==='ativo'?'Cliente reativado.':'Cliente inativado.'); }
+function toggleClient(id){ const c=S.clients.find(x=>x.id===id); if(!c)return; c.status=c.status==='ativo'?'inativo':'ativo'; if(c.status==='ativo') autoGerarLancamentos(true); persist(); renderClients(); renderReceber(); renderCalendar(); updateBadges(); toast(c.status==='ativo'?'Cliente reativado.':'Cliente inativado.'); }
 function toggleCliNFe(id){ const c=S.clients.find(x=>x.id===id); if(!c)return; c.nfe=!c.nfe; renderClients(); toast(c.nfe?'✓ NF-e marcada!':'NF-e desmarcada.'); }
 
 // ══════════════════════════════════════════
@@ -2436,29 +2420,11 @@ function saveEmployee(){
   if(editId){ const i=S.employees.findIndex(e=>e.id===emp.id); if(i>=0)S.employees[i]=emp; }
   else S.employees.push(emp);
 
-  // Auto-gerar lançamento em Contas a Pagar se for novo funcionário com salário e dia
-  if(isNew && salario && diaPgto){
-    const now    = new Date();
-    const dueDay = parseInt(diaPgto);
-    const month  = now.getDate() > dueDay ? now.getMonth()+1 : now.getMonth();
-    const year   = month > 11 ? now.getFullYear()+1 : now.getFullYear();
-    const dueDate = `${year}-${String((month%12)+1||12).padStart(2,'0')}-${String(Math.min(dueDay,28)).padStart(2,'0')}`;
-    S.transactions.push({
-      id:   Date.now()+2,
-      date: dueDate,
-      desc: `Salário — ${nome}`,
-      cat:  'Salários e Encargos',
-      cc:   emp.dept||'',
-      v:    -salario,
-      st:   'pendente',
-      tp:   'saida'
-    });
-  }
-
+  autoGerarLancamentos(true);
   persist();
   closeModal('overlay-emp');
   renderEmployees(); renderPagar(); renderCalendar(); updateBadges();
-  toast(isNew ? '✓ Funcionário salvo e lançamento gerado!' : '✓ Funcionário atualizado!');
+  toast(isNew ? '✓ Funcionário salvo e salário lançado em Contas a Pagar!' : '✓ Funcionário atualizado!');
 }
 
 function editEmployee(id){ openEmpModal(S.employees.find(e=>e.id===id)); }
@@ -2682,7 +2648,8 @@ function saveDespesaFixa(){
   if(!S.despesasFixas) S.despesasFixas = [];
   if(editId){ const i=S.despesasFixas.findIndex(d=>d.id===editId); if(i>=0)S.despesasFixas[i]=df; }
   else S.despesasFixas.push(df);
-  persist(); closeModal('overlay-df'); renderDespesasFixas(); renderCalendar();
+  autoGerarLancamentos(true);
+  persist(); closeModal('overlay-df'); renderDespesasFixas(); renderPagar(); renderCalendar();
   toast('✓ Despesa fixa salva!');
 }
 
@@ -2744,6 +2711,132 @@ function gerarDespesasMes(){
   } else {
     toast('Todas as despesas já foram lançadas este mês.');
   }
+}
+
+// ══════════════════════════════════════════
+// AUTO-GERAÇÃO DE CONTAS A PAGAR
+// ══════════════════════════════════════════
+function nextProxDate(dateStr, recorrencia){
+  const d = new Date(dateStr + 'T12:00:00');
+  switch(recorrencia){
+    case 'semanal':    d.setDate(d.getDate() + 7); break;
+    case 'mensal':     d.setMonth(d.getMonth() + 1); break;
+    case 'trimestral': d.setMonth(d.getMonth() + 3); break;
+    case 'semestral':  d.setMonth(d.getMonth() + 6); break;
+    case 'anual':      d.setFullYear(d.getFullYear() + 1); break;
+    default:           d.setMonth(d.getMonth() + 1);
+  }
+  return d.toISOString().slice(0,10);
+}
+
+function autoGerarLancamentos(silent){
+  const now      = new Date();
+  const todayStr = now.toISOString().slice(0,10);
+  const y        = now.getFullYear();
+  const m        = now.getMonth();
+  const ym       = `${y}-${String(m+1).padStart(2,'0')}`;
+  let geradas    = 0;
+
+  // 1. Despesas Fixas — gera para o mês atual
+  (S.despesasFixas || []).filter(d => d.status === 'ativa').forEach(df => {
+    const day     = Math.min(parseInt(df.dia) || 5, 28);
+    const dateStr = `${ym}-${String(day).padStart(2,'0')}`;
+    const jaExiste = S.transactions.some(t =>
+      t.tp === 'saida' && t.desc === df.desc && t.date === dateStr
+    );
+    if(!jaExiste){
+      S.transactions.push({
+        id:   Date.now() + geradas,
+        date: dateStr,
+        desc: df.desc,
+        cat:  df.cat || 'Outros',
+        cc:   df.cc  || '',
+        v:    -(parseFloat(df.valor) || 0),
+        st:   'pendente',
+        tp:   'saida'
+      });
+      geradas++;
+    }
+  });
+
+  // 2. Assinaturas — gera sempre que a data de cobrança chegou
+  S.subscriptions.filter(s => s.status === 'ativa').forEach(s => {
+    let iter = 0;
+    while(s.prox && s.prox <= todayStr && iter < 60){
+      const jaExiste = S.transactions.some(t =>
+        t.tp === 'saida' && t.desc === s.nome && t.date === s.prox
+      );
+      if(!jaExiste){
+        S.transactions.push({
+          id:   Date.now() + geradas,
+          date: s.prox,
+          desc: s.nome,
+          cat:  s.cat || 'Tecnologia e Software',
+          cc:   s.cc  || '',
+          v:    -(parseFloat(s.valor) || 0),
+          st:   s.prox < todayStr ? 'vencido' : 'pendente',
+          tp:   'saida'
+        });
+        geradas++;
+      }
+      s.prox = nextProxDate(s.prox, s.recorrencia);
+      iter++;
+    }
+  });
+
+  // 3. Funcionários — gera salário do mês atual
+  S.employees.forEach(emp => {
+    if(!emp.salario || !emp.diaPgto) return;
+    const day     = Math.min(parseInt(emp.diaPgto) || 5, 28);
+    const dateStr = `${ym}-${String(day).padStart(2,'0')}`;
+    const jaExiste = S.transactions.some(t =>
+      t.tp === 'saida' && t.desc === `Salário — ${emp.nome}` && t.date === dateStr
+    );
+    if(!jaExiste){
+      S.transactions.push({
+        id:   Date.now() + geradas,
+        date: dateStr,
+        desc: `Salário — ${emp.nome}`,
+        cat:  'Salários e Encargos',
+        cc:   emp.dept || '',
+        v:    -(parseFloat(emp.salario) || 0),
+        st:   dateStr < todayStr ? 'vencido' : 'pendente',
+        tp:   'saida'
+      });
+      geradas++;
+    }
+  });
+
+  // 4. Clientes ativos — gera recebível do mês atual
+  S.clients.filter(c => c.status === 'ativo').forEach(cli => {
+    if(!cli.valor || !cli.dia) return;
+    const day     = Math.min(parseInt(cli.dia) || 1, 28);
+    const dateStr = `${ym}-${String(day).padStart(2,'0')}`;
+    const jaExiste = S.transactions.some(t =>
+      t.tp === 'entrada' && t.desc === `Mensalidade — ${cli.nome}` && t.date === dateStr
+    );
+    if(!jaExiste){
+      S.transactions.push({
+        id:          Date.now() + geradas,
+        date:        dateStr,
+        desc:        `Mensalidade — ${cli.nome}`,
+        cat:         'Serviços Prestados',
+        cc:          '',
+        v:           parseFloat(cli.valor) || 0,
+        st:          'pendente',
+        tp:          'entrada',
+        clienteId:   cli.id,
+        clienteNome: cli.nome
+      });
+      geradas++;
+    }
+  });
+
+  if(geradas > 0){
+    persist();
+    if(!silent) toast(`✓ ${geradas} lançamento${geradas>1?'s':''} gerado${geradas>1?'s':''} automaticamente.`);
+  }
+  return geradas;
 }
 
 // ══════════════════════════════════════════
@@ -2830,8 +2923,9 @@ function saveSubscription(){
   };
   if(editId){ const i=S.subscriptions.findIndex(s=>s.id===sub.id); if(i>=0)S.subscriptions[i]=sub; }
   else S.subscriptions.push(sub);
+  autoGerarLancamentos(true);
   closeModal('overlay-as');
-  renderSubscriptions(); updateBadges();
+  renderSubscriptions(); renderPagar(); updateBadges();
   toast('✓ Assinatura salva!');
 }
 
@@ -3607,6 +3701,9 @@ async function boot(){
 
   // 3. Carrega dados
   const hadData = await loadFromStorage();
+
+  // 3b. Gera automaticamente Despesas Fixas e Assinaturas em Contas a Pagar
+  autoGerarLancamentos(true);
 
   // 4. Renderiza UI
   renderAll();
