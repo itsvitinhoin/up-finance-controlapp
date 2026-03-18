@@ -499,8 +499,8 @@ th.num{text-align:right}
         <svg viewBox="0 0 16 16" fill="none" stroke-width="2"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
       </div>
       <div>
-        <div class="login-brand-name">FinanceApp</div>
-        <div class="login-brand-sub">Grupo UP — Controle Financeiro</div>
+        <div class="login-brand-name">UP Finance</div>
+        <div class="login-brand-sub">Financial Control for Grupo UP</div>
       </div>
     </div>
     <div class="login-heading">
@@ -538,10 +538,10 @@ th.num{text-align:right}
 <div id="sidebar">
   <div class="logo">
     <div class="logo-row">
-      <div class="logo-icon"><svg viewBox="0 0 16 16" fill="none" stroke-width="2"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></div>
-      <span class="logo-name" id="app-name">FinanceApp</span>
+      <div class="logo-icon" id="logo-icon-wrap"><svg viewBox="0 0 16 16" fill="none" stroke-width="2"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></div>
+      <span class="logo-name" id="app-name">UP Finance</span>
     </div>
-    <div class="logo-sub" id="app-sub">Controle Financeiro</div>
+    <div class="logo-sub" id="app-sub">Financial Control for Grupo UP</div>
   </div>
   <div class="nav-sec">
     <div class="nav-label">Principal</div>
@@ -1116,8 +1116,8 @@ th.num{text-align:right}
       <div class="settings-section">
         <div class="settings-title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Identidade do App</div>
         <div class="profile-grid">
-          <div class="field-row"><label>Nome da empresa</label><input id="cfg-company" value="FinanceApp" oninput="updateBranding()"></div>
-          <div class="field-row"><label>Slogan / Subtítulo</label><input id="cfg-sub" value="Controle Financeiro" oninput="updateBranding()"></div>
+          <div class="field-row"><label>Nome da empresa</label><input id="cfg-company" value="UP Finance" oninput="updateBranding()"></div>
+          <div class="field-row"><label>Slogan / Subtítulo</label><input id="cfg-sub" value="Financial Control for Grupo UP" oninput="updateBranding()"></div>
           <div class="field-row"><label>Cor principal</label>
             <div class="color-opt">
               <div class="color-dot sel" style="background:#2563eb" data-color="#2563eb" onclick="pickColor(this)"></div>
@@ -1128,7 +1128,17 @@ th.num{text-align:right}
               <div class="color-dot" style="background:#0891b2" data-color="#0891b2" onclick="pickColor(this)"></div>
             </div>
           </div>
-          <div class="field-row"><label>Moeda</label><select><option>BRL — Real Brasileiro</option><option>USD — Dólar</option><option>EUR — Euro</option></select></div>
+          <div class="field-row"><label>Moeda</label><select id="cfg-currency" onchange="updateCurrency()"><option value="BRL">BRL — Real Brasileiro</option><option value="USD">USD — Dólar</option><option value="EUR">EUR — Euro</option></select></div>
+          <div class="field-row"><label>Logo personalizado</label>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <img id="logo-preview" src="" style="display:none;height:36px;max-width:140px;border-radius:4px;object-fit:contain;border:1px solid var(--border)">
+              <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0">
+                Carregar imagem
+                <input type="file" accept="image/*" style="display:none" onchange="uploadLogo(this)">
+              </label>
+              <button class="btn btn-outline btn-sm" id="logo-clear-btn" onclick="clearLogo()" style="display:none">Remover</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1173,10 +1183,10 @@ th.num{text-align:right}
       <div class="settings-section">
         <div class="settings-title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="12" height="11" rx="1"/><path d="M5 1v4M11 1v4M2 7h12"/></svg>Período fiscal</div>
         <div class="profile-grid">
-          <div class="field-row"><label>Início do exercício</label><select><option>Janeiro</option><option>Abril</option><option>Julho</option><option>Outubro</option></select></div>
-          <div class="field-row"><label>Formato de data</label><select><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></div>
+          <div class="field-row"><label>Início do exercício</label><select id="cfg-fiscal-month" onchange="updateFiscal()"><option value="Janeiro">Janeiro</option><option value="Abril">Abril</option><option value="Julho">Julho</option><option value="Outubro">Outubro</option></select></div>
+          <div class="field-row"><label>Formato de data</label><select id="cfg-date-format" onchange="updateFiscal()"><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
         </div>
-        <button class="btn btn-primary" onclick="toast('Configurações salvas!')">Salvar configurações</button>
+        <button class="btn btn-primary" onclick="persist();toast('Configurações salvas!')">Salvar configurações</button>
       </div>
 
       <div class="settings-section">
@@ -1480,6 +1490,13 @@ const S = {
   concFilter: 'todos',
   planos: ['Starter','Profissional','Enterprise','Personalizado'],
   fluxoFilter: 'all',
+  company: 'UP Finance',
+  sub: 'Financial Control for Grupo UP',
+  color: '#2563eb',
+  currency: 'BRL',
+  fiscalMonth: 'Janeiro',
+  dateFormat: 'DD/MM/YYYY',
+  logoUrl: '',
   charts: {},
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth()
@@ -2023,6 +2040,33 @@ function renderEmployees(){
 }
 
 function renderSettings(){
+  // Restore branding inputs from state
+  const cfgCompany = document.getElementById('cfg-company');
+  const cfgSub = document.getElementById('cfg-sub');
+  if(cfgCompany) cfgCompany.value = S.company || 'UP Finance';
+  if(cfgSub) cfgSub.value = S.sub || 'Financial Control for Grupo UP';
+  // Restore color dot selection
+  document.querySelectorAll('.color-dot').forEach(d=>{
+    d.classList.toggle('sel', d.dataset.color === (S.color||'#2563eb'));
+  });
+  document.documentElement.style.setProperty('--blue', S.color||'#2563eb');
+  // Restore currency
+  const cfgCurrency = document.getElementById('cfg-currency');
+  if(cfgCurrency) cfgCurrency.value = S.currency || 'BRL';
+  // Restore fiscal selects
+  const cfgFiscal = document.getElementById('cfg-fiscal-month');
+  const cfgDateFmt = document.getElementById('cfg-date-format');
+  if(cfgFiscal) cfgFiscal.value = S.fiscalMonth || 'Janeiro';
+  if(cfgDateFmt) cfgDateFmt.value = S.dateFormat || 'DD/MM/YYYY';
+  // Apply logo
+  applyLogo();
+  // Apply branding to sidebar/title
+  const appName = document.getElementById('app-name');
+  const appSub = document.getElementById('app-sub');
+  if(appName) appName.textContent = S.company || 'UP Finance';
+  if(appSub) appSub.textContent = S.sub || 'Financial Control for Grupo UP';
+  document.title = (S.company || 'UP Finance') + ' — Grupo UP';
+
   document.getElementById('cats-desp').innerHTML = S.cats.desp.map((c,i)=>`
     <span class="tag-item"><span>${c}</span><button class="tag-del" onclick="removeCat('desp',${i})">×</button></span>`).join('');
   document.getElementById('cats-rec').innerHTML = S.cats.rec.map((c,i)=>`
@@ -2668,15 +2712,64 @@ function updatePeriod(){ toast('Período atualizado!'); }
 function updateBranding(){
   const n = document.getElementById('cfg-company').value;
   const s = document.getElementById('cfg-sub').value;
-  document.getElementById('app-name').textContent = n||'FinanceApp';
-  document.getElementById('app-sub').textContent = s||'Controle Financeiro';
-  document.title = (n||'FinanceApp') + ' — v2';
+  S.company = n || 'UP Finance';
+  S.sub = s || 'Financial Control for Grupo UP';
+  document.getElementById('app-name').textContent = S.company;
+  document.getElementById('app-sub').textContent = S.sub;
+  document.title = S.company + ' — Grupo UP';
+  applyLogo();
+  persist();
+}
+function updateCurrency(){
+  const el = document.getElementById('cfg-currency');
+  if(el){ S.currency = el.value; persist(); toast('Moeda salva!'); }
+}
+function updateFiscal(){
+  const m = document.getElementById('cfg-fiscal-month');
+  const f = document.getElementById('cfg-date-format');
+  if(m) S.fiscalMonth = m.value;
+  if(f) S.dateFormat = f.value;
+  persist(); toast('Período fiscal salvo!');
 }
 function pickColor(el){
   document.querySelectorAll('.color-dot').forEach(d=>d.classList.remove('sel'));
   el.classList.add('sel');
-  document.documentElement.style.setProperty('--blue', el.dataset.color);
-  toast('Cor aplicada!');
+  S.color = el.dataset.color;
+  document.documentElement.style.setProperty('--blue', S.color);
+  persist(); toast('Cor aplicada!');
+}
+function uploadLogo(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    S.logoUrl = e.target.result;
+    applyLogo();
+    persist();
+    toast('Logo atualizado!');
+  };
+  reader.readAsDataURL(file);
+}
+function clearLogo(){
+  S.logoUrl = '';
+  applyLogo();
+  persist();
+  toast('Logo removido.');
+}
+function applyLogo(){
+  const wrap = document.getElementById('logo-icon-wrap');
+  const preview = document.getElementById('logo-preview');
+  const clearBtn = document.getElementById('logo-clear-btn');
+  if(!wrap) return;
+  if(S.logoUrl){
+    wrap.innerHTML = `<img src="${S.logoUrl}" style="height:28px;max-width:80px;border-radius:4px;object-fit:contain">`;
+    if(preview){ preview.src = S.logoUrl; preview.style.display = ''; }
+    if(clearBtn) clearBtn.style.display = '';
+  } else {
+    wrap.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke-width="2"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
+    if(preview){ preview.src = ''; preview.style.display = 'none'; }
+    if(clearBtn) clearBtn.style.display = 'none';
+  }
 }
 
 // ══════════════════════════════════════════
@@ -3585,6 +3678,13 @@ async function saveSettings(){
     {chave:'regime',         valor: S.regime||''},
     {chave:'fat_anual',      valor: String(S.fatAnual||0)},
     {chave:'orcamentos',     valor: JSON.stringify(S.orcamentos||{})},
+    {chave:'company',        valor: S.company||'UP Finance'},
+    {chave:'sub',            valor: S.sub||'Financial Control for Grupo UP'},
+    {chave:'color',          valor: S.color||'#2563eb'},
+    {chave:'currency',       valor: S.currency||'BRL'},
+    {chave:'fiscal_month',   valor: S.fiscalMonth||'Janeiro'},
+    {chave:'date_format',    valor: S.dateFormat||'DD/MM/YYYY'},
+    {chave:'logo_url',       valor: S.logoUrl||''},
   ];
   const { error } = await supabase.from('config_settings').upsert(settings, {onConflict:'chave'});
   if(error) console.warn('saveSettings:', error.message);
@@ -3626,6 +3726,8 @@ async function saveToStorage(){
     clients:S.clients, impostos:S.impostos, despesasFixas:S.despesasFixas||[], regime:S.regime, fatAnual:S.fatAnual,
     saldoInicial:S.saldoInicial, saldoExtrato:S.saldoExtrato, dataExtrato:S.dataExtrato,
     orcamentos:S.orcamentos, cats:S.cats, centros:S.centros, planos:S.planos,
+    company:S.company, sub:S.sub, color:S.color, currency:S.currency,
+    fiscalMonth:S.fiscalMonth, dateFormat:S.dateFormat, logoUrl:S.logoUrl,
     savedAt: new Date().toISOString()
   };
   try { await idbPut('store',{key:'main',...payload}); } catch(_){}
@@ -3642,6 +3744,9 @@ async function saveToStorage(){
       upsertTable('subscriptions',  S.subscriptions.map(subToRow)),
       upsertTable('impostos',       S.impostos.map(impToRow)),
       saveSettings(),
+      saveCats(),
+      saveCentros(),
+      savePlanos(),
     ]);
   } catch(e){ console.warn('Supabase save error:', e.message); }
 }
@@ -3683,6 +3788,13 @@ async function loadFromStorage(){
           if(cfg.regime)        S.regime      = cfg.regime;
           if(cfg.fat_anual)     S.fatAnual    = parseFloat(cfg.fat_anual)||0;
           if(cfg.orcamentos)    try { S.orcamentos = JSON.parse(cfg.orcamentos); } catch(_){}
+          if(cfg.company)       S.company     = cfg.company;
+          if(cfg.sub)           S.sub         = cfg.sub;
+          if(cfg.color)         S.color       = cfg.color;
+          if(cfg.currency)      S.currency    = cfg.currency;
+          if(cfg.fiscal_month)  S.fiscalMonth = cfg.fiscal_month;
+          if(cfg.date_format)   S.dateFormat  = cfg.date_format;
+          if(cfg.logo_url !== undefined) S.logoUrl = cfg.logo_url;
         }
         if(catsRes.data && catsRes.data.length){
           S.cats.desp = catsRes.data.filter(r=>r.tipo==='desp').map(r=>r.nome);
@@ -3730,6 +3842,13 @@ function applyState(data){
   if(data.cats)                     S.cats          = data.cats;
   if(data.centros)                  S.centros       = data.centros;
   if(data.planos)                   S.planos        = data.planos;
+  if(data.company)                  S.company       = data.company;
+  if(data.sub)                      S.sub           = data.sub;
+  if(data.color)                    S.color         = data.color;
+  if(data.currency)                 S.currency      = data.currency;
+  if(data.fiscalMonth)              S.fiscalMonth   = data.fiscalMonth;
+  if(data.dateFormat)               S.dateFormat    = data.dateFormat;
+  if(data.logoUrl !== undefined)    S.logoUrl       = data.logoUrl;
 }
 
 // ── DELETE de registro individual (mais eficiente que upsert tudo) ──
@@ -3767,6 +3886,8 @@ async function exportBackup(){
     clients:S.clients, impostos:S.impostos, despesasFixas:S.despesasFixas||[], regime:S.regime, fatAnual:S.fatAnual,
     saldoInicial:S.saldoInicial, saldoExtrato:S.saldoExtrato, dataExtrato:S.dataExtrato,
     orcamentos:S.orcamentos, cats:S.cats, centros:S.centros, planos:S.planos,
+    company:S.company, sub:S.sub, color:S.color, currency:S.currency,
+    fiscalMonth:S.fiscalMonth, dateFormat:S.dateFormat, logoUrl:S.logoUrl,
   };
   let files = [];
   if(supabase){ try{ const {data}=await supabase.from('nfe_files').select('*'); if(data) files=data; }catch(_){} }
@@ -3879,6 +4000,8 @@ async function boot(){
     ['imp-fat-anual',  ()=>S.fatAnual],
   ];
   fieldMap.forEach(([id, val])=>{ const el=document.getElementById(id); if(el&&val()) el.value=val(); });
+  // Restaura branding do estado salvo
+  renderSettings();
 
   // 6. Desenha gráficos
   requestAnimationFrame(()=>{
@@ -3896,7 +4019,7 @@ async function boot(){
       toast(`✓ Dados carregados (${src}) — ${savedAt ? new Date(savedAt).toLocaleString('pt-BR') : ''}`);
     } catch(_){ toast(`✓ Dados carregados (${src})`); }
   } else {
-    toast('Bem-vindo ao FinanceApp! Comece adicionando transações.');
+    toast('Bem-vindo ao UP Finance! Comece adicionando transações.');
   }
 }
 
